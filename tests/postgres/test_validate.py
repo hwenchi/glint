@@ -8,6 +8,7 @@ from glint.postgres.validate import (
     ModifyingCTE,
     NotAllowed,
     NotSelect,
+    OperatorNotAllowed,
     RecursiveCTE,
     SelectInto,
     StatementCount,
@@ -38,6 +39,21 @@ from glint.postgres.validate import (
         "SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM t",
         "SELECT rank() OVER (PARTITION BY a ORDER BY b) FROM t",
         "SELECT extract(year FROM d), substring(s FROM 2), trim(s) FROM t",
+        # operators
+        "SELECT a + b * 2, -a, a || 'x' FROM t WHERE a = 1 AND b <> 2",
+        "SELECT a FROM t WHERE a != 1",
+        "SELECT a FROM t WHERE a OPERATOR(pg_catalog.=) 1",
+        "SELECT a FROM t WHERE a = ANY (SELECT b FROM u) AND a < ALL (SELECT b FROM u)",
+        "SELECT a FROM t WHERE a IS DISTINCT FROM b AND a IS NOT DISTINCT FROM c",
+        "SELECT NULLIF(a, 0) FROM t",
+        "SELECT a FROM t WHERE a IN (1, 2) AND b NOT IN (3)",
+        "SELECT a FROM t WHERE s LIKE 'x%' AND s NOT ILIKE 'y%' AND s ~ '^z'",
+        "SELECT a FROM t WHERE a BETWEEN 1 AND 2 AND b NOT BETWEEN SYMMETRIC 3 AND 1",
+        "SELECT j -> 'k', j ->> 'k', a << 2 FROM t WHERE j @> b AND a && b",
+        "SELECT a FROM t WHERE a IN (SELECT b FROM u) AND a < ALL (SELECT b FROM u)",
+        "SELECT a FROM t ORDER BY a USING <",
+        "SELECT a FROM t ORDER BY a USING OPERATOR(pg_catalog.<)",
+        "SELECT " + " + ".join(["1"] * 5000),
     ],
 )
 def test_accepts(sql):
@@ -87,8 +103,8 @@ def test_rejects(sql, error):
         ("SELECT a FROM t TABLESAMPLE BERNOULLI (1)", "RangeTableSample"),
         ("SELECT a FROM XMLTABLE('/a' PASSING '<a/>' COLUMNS a int)", "RangeTableFunc"),
         ("SELECT $1", "ParamRef"),
-        # not yet allowed: operators, casts, functions in FROM
-        ("SELECT a FROM t WHERE a = 1", "A_Expr"),
+        ("SELECT a FROM t WHERE s SIMILAR TO 'x%'", "AEXPR_SIMILAR"),
+        # not yet allowed: casts, functions in FROM
         ("SELECT a::int FROM t", "TypeCast"),
         ("SELECT a FROM generate_series(1, 10) AS a", "RangeFunction"),
     ],
@@ -123,5 +139,26 @@ def test_not_allowed(sql, construct):
 )
 def test_function_not_allowed(sql, name):
     with pytest.raises(FunctionNotAllowed) as e:
+        validate(sql)
+    assert e.value.name == name
+
+
+@pytest.mark.parametrize(
+    "sql, name",
+    [
+        ("SELECT a FROM t WHERE a OPERATOR(public.=) 1", "public.="),
+        ("SELECT a FROM t WHERE a OPERATOR(public.@>) ANY (SELECT b FROM u)", "public.@>"),
+        ("SELECT a FROM t WHERE a OPERATOR(public.<) ALL (SELECT b FROM u)", "public.<"),
+        # nested inside allowed constructs
+        ("SELECT count(*) FILTER (WHERE a OPERATOR(public.=) b) FROM t", "public.="),
+        ("SELECT a FROM t WHERE a IN (b OPERATOR(public.+) c)", "public.+"),
+        # ORDER BY ... USING, wherever ORDER BY appears
+        ("SELECT a FROM t ORDER BY a USING OPERATOR(public.<)", "public.<"),
+        ("SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY a USING OPERATOR(public.<)) FROM t", "public.<"),
+        ("SELECT rank() OVER (ORDER BY a USING OPERATOR(public.<)) FROM t", "public.<"),
+    ],
+)
+def test_operator_not_allowed(sql, name):
+    with pytest.raises(OperatorNotAllowed) as e:
         validate(sql)
     assert e.value.name == name

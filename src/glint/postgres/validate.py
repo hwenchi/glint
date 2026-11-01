@@ -1,6 +1,12 @@
-"""Static check that a query is a single read-only SELECT."""
+"""Static check that a query is a single read-only SELECT.
+
+Functions and operators are checked by name, so the query must run with
+search_path pinned to pg_catalog, pg_temp. Otherwise an unqualified name can
+resolve to a user-defined object in another schema.
+"""
 
 from pglast import ast, parse_sql
+from pglast.enums import A_Expr_Kind
 from pglast.parser import ParseError
 
 
@@ -56,6 +62,14 @@ class FunctionNotAllowed(Rejected):
         self.name = name
 
 
+class OperatorNotAllowed(Rejected):
+    """An operator qualified with a schema other than pg_catalog."""
+
+    def __init__(self, name: str):
+        super().__init__(f"operator {name} is not allowed")
+        self.name = name
+
+
 # Built-in functions with no side effects. Functions that make a large value from
 # a small input (repeat, lpad, rpad) or concatenate a whole group (array_agg,
 # string_agg) are left out, because the timeout doesn't bound memory.
@@ -86,6 +100,27 @@ ALLOWED_FUNCTIONS = {
     "make_date", "make_time", "make_timestamp", "make_interval", "isfinite",
     "justify_days", "justify_hours", "justify_interval",
     "to_char", "to_date", "to_timestamp", "to_number",
+}
+
+# Their name is the keyword, not an operator. Postgres rewrites them to >= and <=.
+BETWEEN_KINDS = {
+    A_Expr_Kind.AEXPR_BETWEEN,
+    A_Expr_Kind.AEXPR_NOT_BETWEEN,
+    A_Expr_Kind.AEXPR_BETWEEN_SYM,
+    A_Expr_Kind.AEXPR_NOT_BETWEEN_SYM,
+}
+
+# SIMILAR is left out: it wraps its pattern in a hidden function call.
+ALLOWED_EXPR_KINDS = BETWEEN_KINDS | {
+    A_Expr_Kind.AEXPR_OP,
+    A_Expr_Kind.AEXPR_OP_ANY,
+    A_Expr_Kind.AEXPR_OP_ALL,
+    A_Expr_Kind.AEXPR_DISTINCT,
+    A_Expr_Kind.AEXPR_NOT_DISTINCT,
+    A_Expr_Kind.AEXPR_NULLIF,
+    A_Expr_Kind.AEXPR_IN,
+    A_Expr_Kind.AEXPR_LIKE,
+    A_Expr_Kind.AEXPR_ILIKE,
 }
 
 
@@ -131,6 +166,14 @@ def _check_node(node: ast.Node) -> None:
             raise CrossDatabase("database-qualified table names are not allowed")
         case ast.FuncCall(funcname=names):
             _check_function(names)
+        case ast.A_Expr(kind=kind) if kind not in ALLOWED_EXPR_KINDS:
+            raise NotAllowed(kind.name)
+        case ast.A_Expr(kind=kind, name=names) if kind not in BETWEEN_KINDS:
+            _check_operator(names)
+        case ast.SubLink(operName=names) if names:
+            _check_operator(names)
+        case ast.SortBy(useOp=names) if names:
+            _check_operator(names)
         case (
             ast.SelectStmt()
             | ast.WithClause()
@@ -159,6 +202,7 @@ def _check_node(node: ast.Node) -> None:
             | ast.MinMaxExpr()
             | ast.RowExpr()
             | ast.WindowDef()
+            | ast.A_Expr()
         ):
             pass
         case _:
@@ -171,3 +215,13 @@ def _check_function(names: tuple[ast.String, ...]) -> None:
             return
         case parts:
             raise FunctionNotAllowed(".".join(parts))
+
+
+def _check_operator(names: tuple[ast.String, ...]) -> None:
+    # Only the schema is checked: the executor pins search_path to pg_catalog,
+    # where every operator is built-in and has no side effects.
+    match [n.sval for n in names]:
+        case [_] | ["pg_catalog", _]:
+            return
+        case parts:
+            raise OperatorNotAllowed(".".join(parts))
