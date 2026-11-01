@@ -1,3 +1,6 @@
+VEGA_LITE_VERSION := 6.5.0
+VEGA_LITE_SCHEMA := src/glint/schemas/vega-lite-v$(VEGA_LITE_VERSION).json
+
 PAGILA_URL := https://raw.githubusercontent.com/devrimgunduz/pagila/ce6e114236bb828e5ec0dc835f65f1bf1b9179f5
 PAGILA := tests/db/initdb/01-pagila-schema.sql tests/db/initdb/02-pagila-data.sql
 
@@ -7,7 +10,7 @@ COMPOSE := docker compose -f tests/db/compose.yaml
 export GLINT_TEST_DB_PORT ?= 15432
 export GLINT_TEST_DATABASE_URL := postgresql://postgres:postgres@127.0.0.1:$(GLINT_TEST_DB_PORT)/pagila
 
-.PHONY: test image pagila db db-down db-reset
+.PHONY: test image pagila db db-down db-reset schema
 
 test: db
 	uv run pytest
@@ -38,3 +41,10 @@ tests/db/initdb/01-pagila-schema.sql:
 
 tests/db/initdb/02-pagila-data.sql:
 	curl -fsSL --create-dirs -o $@ $(PAGILA_URL)/pagila-data.sql
+
+# Vendored Vega-Lite schema, committed because the package needs it at runtime.
+# To upgrade, bump VEGA_LITE_VERSION, run this, and commit the new file.
+schema: $(VEGA_LITE_SCHEMA)
+
+$(VEGA_LITE_SCHEMA):
+	curl -fsSL --create-dirs -o $@ https://cdn.jsdelivr.net/npm/vega-lite@$(VEGA_LITE_VERSION)/build/vega-lite-schema.json
