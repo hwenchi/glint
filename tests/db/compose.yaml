@@ -1,0 +1,25 @@
+name: glint-test
+
+services:
+  db:
+    image: glint-test-db  # built by `make image`
+    pull_policy: never
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pagila
+    ports:
+      - "127.0.0.1:${GLINT_TEST_DB_PORT:-15432}:5432"
+    volumes:
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+      - data:/var/lib/postgresql
+    healthcheck:
+      # Over TCP: during init the server only listens on its Unix socket, so
+      # this stays unhealthy until the init scripts have finished.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "pagila"]
+      interval: 1s
+      timeout: 3s
+      retries: 120
+
+volumes:
+  data:
