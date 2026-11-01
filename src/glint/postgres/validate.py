@@ -13,11 +13,12 @@ from pglast import ast, parse_sql
 from pglast.enums import A_Expr_Kind
 from pglast.parser import ParseError
 
+from glint.engine import QueryError
 from glint.postgres.tree import walk
 
 
-class Rejected(ValueError):
-    """The query is not provably safe. The message is meant for the model."""
+class Rejected(QueryError):
+    """The query is not provably safe."""
 
 
 class InvalidSyntax(Rejected):

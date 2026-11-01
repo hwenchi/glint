@@ -4,7 +4,8 @@ import psycopg
 import pytest
 from psycopg.pq import TransactionStatus
 
-from glint.postgres.execute import TooManyRows, _transaction, run, with_limit
+from glint.engine import TooManyRows
+from glint.postgres.execute import _transaction, run, with_limit
 from glint.postgres.validate import validate
 
 

@@ -3,7 +3,6 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import timedelta
-from typing import Any, NamedTuple
 
 import psycopg
 from pglast import ast
@@ -11,20 +10,7 @@ from pglast.enums import LimitOption
 from pglast.stream import RawStream
 from psycopg.pq import TransactionStatus
 
-
-class TooManyRows(Exception):
-    """The result has more rows than allowed. The message is meant for the model."""
-
-    def __init__(self, max_rows: int):
-        super().__init__(
-            f"the query returned more than {max_rows} rows: aggregate or filter it"
-        )
-        self.max_rows = max_rows
-
-
-class Result(NamedTuple):
-    columns: list[str]
-    rows: list[tuple[Any, ...]]
+from glint.engine import Result, TooManyRows
 
 
 def run(
