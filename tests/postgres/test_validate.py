@@ -2,6 +2,7 @@ import pytest
 
 from glint.postgres.validate import (
     CrossDatabase,
+    FunctionNotAllowed,
     InvalidSyntax,
     LockingClause,
     ModifyingCTE,
@@ -29,6 +30,14 @@ from glint.postgres.validate import (
         "SELECT COALESCE(a, b), GREATEST(a, b) FROM t",
         "SELECT a FROM t GROUP BY ROLLUP (a)",
         "VALUES (1), (2)",
+        # functions
+        "SELECT count(*), avg(a) FROM t",
+        "SELECT pg_catalog.count(*) FROM t",
+        "SELECT COUNT(*) FROM t",
+        "SELECT count(DISTINCT a) FILTER (WHERE b IS NULL) FROM t",
+        "SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY a) FROM t",
+        "SELECT rank() OVER (PARTITION BY a ORDER BY b) FROM t",
+        "SELECT extract(year FROM d), substring(s FROM 2), trim(s) FROM t",
     ],
 )
 def test_accepts(sql):
@@ -78,8 +87,7 @@ def test_rejects(sql, error):
         ("SELECT a FROM t TABLESAMPLE BERNOULLI (1)", "RangeTableSample"),
         ("SELECT a FROM XMLTABLE('/a' PASSING '<a/>' COLUMNS a int)", "RangeTableFunc"),
         ("SELECT $1", "ParamRef"),
-        # not yet allowed: function calls, operators, casts
-        ("SELECT count(*) FROM t", "FuncCall"),
+        # not yet allowed: operators, casts, functions in FROM
         ("SELECT a FROM t WHERE a = 1", "A_Expr"),
         ("SELECT a::int FROM t", "TypeCast"),
         ("SELECT a FROM generate_series(1, 10) AS a", "RangeFunction"),
@@ -89,3 +97,31 @@ def test_not_allowed(sql, construct):
     with pytest.raises(NotAllowed) as e:
         validate(sql)
     assert e.value.construct == construct
+
+
+@pytest.mark.parametrize(
+    "sql, name",
+    [
+        # side effects or outside the database
+        ("SELECT pg_sleep(10)", "pg_sleep"),
+        ("SELECT nextval('s')", "nextval"),
+        ("SELECT set_config('search_path', 'public', false)", "set_config"),
+        ("SELECT pg_advisory_lock(1)", "pg_advisory_lock"),
+        ("SELECT pg_read_file('/etc/passwd')", "pg_read_file"),
+        ("SELECT lo_export(1, '/tmp/x')", "lo_export"),
+        ("SELECT dblink('host=x', 'DELETE FROM t')", "dblink"),
+        # large values from small inputs
+        ("SELECT repeat('x', 1000000000)", "repeat"),
+        ("SELECT string_agg(a, ',') FROM t", "string_agg"),
+        # shadowing a built-in from another schema
+        ("SELECT public.count(*) FROM t", "public.count"),
+        ("SELECT db.pg_catalog.count(*) FROM t", "db.pg_catalog.count"),
+        ('SELECT "COUNT"(*) FROM t', "COUNT"),
+        # nested inside an allowed function
+        ("SELECT count(pg_sleep(1)) FROM t", "pg_sleep"),
+    ],
+)
+def test_function_not_allowed(sql, name):
+    with pytest.raises(FunctionNotAllowed) as e:
+        validate(sql)
+    assert e.value.name == name

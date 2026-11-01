@@ -48,6 +48,47 @@ class NotAllowed(Rejected):
         self.construct = construct
 
 
+class FunctionNotAllowed(Rejected):
+    """A function outside the allowlist, or qualified with a schema other than pg_catalog."""
+
+    def __init__(self, name: str):
+        super().__init__(f"function {name} is not allowed")
+        self.name = name
+
+
+# Built-in functions with no side effects. Functions that make a large value from
+# a small input (repeat, lpad, rpad) or concatenate a whole group (array_agg,
+# string_agg) are left out, because the timeout doesn't bound memory.
+ALLOWED_FUNCTIONS = {
+    # aggregates
+    "count", "sum", "avg", "min", "max",
+    "stddev", "stddev_samp", "stddev_pop", "variance", "var_samp", "var_pop",
+    "corr", "covar_pop", "covar_samp",
+    "regr_slope", "regr_intercept", "regr_r2", "regr_count",
+    "regr_avgx", "regr_avgy", "regr_sxx", "regr_syy", "regr_sxy",
+    "percentile_cont", "percentile_disc", "mode",
+    "bool_and", "bool_or", "every",
+    # window functions
+    "row_number", "rank", "dense_rank", "percent_rank", "cume_dist", "ntile",
+    "lag", "lead", "first_value", "last_value", "nth_value",
+    # math
+    "abs", "ceil", "ceiling", "floor", "round", "trunc", "sign", "div", "mod",
+    "sqrt", "cbrt", "exp", "ln", "log", "log10", "power", "pi",
+    "degrees", "radians", "sin", "cos", "tan", "asin", "acos", "atan", "atan2",
+    "width_bucket",
+    # strings
+    "lower", "upper", "initcap", "length", "char_length", "octet_length",
+    "substr", "substring", "btrim", "ltrim", "rtrim", "left", "right",
+    "replace", "split_part", "concat", "concat_ws", "position", "strpos",
+    "starts_with", "regexp_replace", "regexp_match", "regexp_like",
+    # dates and times
+    "date_trunc", "date_part", "extract", "date_bin", "age", "timezone",
+    "make_date", "make_time", "make_timestamp", "make_interval", "isfinite",
+    "justify_days", "justify_hours", "justify_interval",
+    "to_char", "to_date", "to_timestamp", "to_number",
+}
+
+
 def validate(sql: str) -> ast.SelectStmt:
     """Return the parsed statement, or raise Rejected."""
     try:
@@ -88,6 +129,8 @@ def _check_node(node: ast.Node) -> None:
             raise ModifyingCTE(f"CTE {node.ctename} must be a SELECT")
         case ast.RangeVar(catalogname=catalog) if catalog:
             raise CrossDatabase("database-qualified table names are not allowed")
+        case ast.FuncCall(funcname=names):
+            _check_function(names)
         case (
             ast.SelectStmt()
             | ast.WithClause()
@@ -115,7 +158,16 @@ def _check_node(node: ast.Node) -> None:
             | ast.CoalesceExpr()
             | ast.MinMaxExpr()
             | ast.RowExpr()
+            | ast.WindowDef()
         ):
             pass
         case _:
             raise NotAllowed(type(node).__name__)
+
+
+def _check_function(names: tuple[ast.String, ...]) -> None:
+    match [n.sval for n in names]:
+        case [name] | ["pg_catalog", name] if name in ALLOWED_FUNCTIONS:
+            return
+        case parts:
+            raise FunctionNotAllowed(".".join(parts))
