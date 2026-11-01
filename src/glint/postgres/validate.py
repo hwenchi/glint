@@ -123,6 +123,39 @@ ALLOWED_EXPR_KINDS = BETWEEN_KINDS | {
     A_Expr_Kind.AEXPR_ILIKE,
 }
 
+# Every node in the tree must be one of these. Anything else is rejected.
+ALLOWED_NODES = frozenset({
+    ast.SelectStmt,
+    ast.WithClause,
+    ast.CommonTableExpr,
+    ast.ResTarget,
+    ast.ColumnRef,
+    ast.A_Star,
+    ast.A_Const,
+    ast.String,
+    ast.Integer,
+    ast.Float,
+    ast.Boolean,
+    ast.BoolExpr,
+    ast.NullTest,
+    ast.BooleanTest,
+    ast.SortBy,
+    ast.GroupingSet,
+    ast.RangeVar,
+    ast.RangeSubselect,
+    ast.JoinExpr,
+    ast.Alias,
+    ast.SubLink,
+    ast.CaseExpr,
+    ast.CaseWhen,
+    ast.CoalesceExpr,
+    ast.MinMaxExpr,
+    ast.RowExpr,
+    ast.WindowDef,
+    ast.A_Expr,
+    ast.FuncCall,
+})
+
 
 def validate(sql: str) -> ast.SelectStmt:
     """Return the parsed statement, or raise Rejected."""
@@ -153,6 +186,8 @@ def _check_tree(root: ast.Node) -> None:
 
 def _check_node(node: ast.Node) -> None:
     """Reject the node unless its type is allowed and its fields are safe."""
+    if type(node) not in ALLOWED_NODES:
+        raise NotAllowed(type(node).__name__)
     match node:
         case ast.SelectStmt(intoClause=into) if into is not None:
             raise SelectInto("SELECT INTO is not allowed")
@@ -174,39 +209,6 @@ def _check_node(node: ast.Node) -> None:
             _check_operator(names)
         case ast.SortBy(useOp=names) if names:
             _check_operator(names)
-        case (
-            ast.SelectStmt()
-            | ast.WithClause()
-            | ast.CommonTableExpr()
-            | ast.ResTarget()
-            | ast.ColumnRef()
-            | ast.A_Star()
-            | ast.A_Const()
-            | ast.String()
-            | ast.Integer()
-            | ast.Float()
-            | ast.Boolean()
-            | ast.BoolExpr()
-            | ast.NullTest()
-            | ast.BooleanTest()
-            | ast.SortBy()
-            | ast.GroupingSet()
-            | ast.RangeVar()
-            | ast.RangeSubselect()
-            | ast.JoinExpr()
-            | ast.Alias()
-            | ast.SubLink()
-            | ast.CaseExpr()
-            | ast.CaseWhen()
-            | ast.CoalesceExpr()
-            | ast.MinMaxExpr()
-            | ast.RowExpr()
-            | ast.WindowDef()
-            | ast.A_Expr()
-        ):
-            pass
-        case _:
-            raise NotAllowed(type(node).__name__)
 
 
 def _check_function(names: tuple[ast.String, ...]) -> None:

@@ -1,6 +1,10 @@
+from enum import Enum, auto
+
 import pytest
+from pglast import ast
 
 from glint.postgres.validate import (
+    ALLOWED_NODES,
     CrossDatabase,
     FunctionNotAllowed,
     InvalidSyntax,
@@ -162,3 +166,80 @@ def test_operator_not_allowed(sql, name):
     with pytest.raises(OperatorNotAllowed) as e:
         validate(sql)
     assert e.value.name == name
+
+
+class Field(Enum):
+    """What a list or string field of a node holds."""
+
+    OPERATOR = auto()  # resolved to code: checked by the validator
+    FUNCTION = auto()  # resolved to code: checked by the validator
+    TABLE = auto()  # checked against the catalog
+    REJECTED = auto()  # the validator rejects the node if set
+    COLUMN = auto()
+    LOCAL_NAME = auto()  # alias, CTE, window or output column name
+    LITERAL = auto()
+    ANALYSIS = auto()  # filled by parse analysis, empty in a raw parse tree
+    NODES = auto()  # child nodes, each checked by the walker
+
+
+REVIEWED_FIELDS = {
+    (ast.A_Expr, "name"): Field.OPERATOR,
+    (ast.SubLink, "operName"): Field.OPERATOR,
+    (ast.SortBy, "useOp"): Field.OPERATOR,
+    (ast.FuncCall, "funcname"): Field.FUNCTION,
+    (ast.RangeVar, "schemaname"): Field.TABLE,
+    (ast.RangeVar, "relname"): Field.TABLE,
+    (ast.RangeVar, "catalogname"): Field.REJECTED,
+    (ast.SelectStmt, "lockingClause"): Field.REJECTED,
+    (ast.ColumnRef, "fields"): Field.COLUMN,
+    (ast.JoinExpr, "usingClause"): Field.COLUMN,
+    (ast.Alias, "aliasname"): Field.LOCAL_NAME,
+    (ast.Alias, "colnames"): Field.LOCAL_NAME,
+    (ast.CommonTableExpr, "ctename"): Field.LOCAL_NAME,
+    (ast.CommonTableExpr, "aliascolnames"): Field.LOCAL_NAME,
+    (ast.ResTarget, "name"): Field.LOCAL_NAME,
+    (ast.RowExpr, "colnames"): Field.LOCAL_NAME,
+    (ast.WindowDef, "name"): Field.LOCAL_NAME,
+    (ast.WindowDef, "refname"): Field.LOCAL_NAME,
+    (ast.String, "sval"): Field.LITERAL,
+    (ast.Float, "fval"): Field.LITERAL,
+    (ast.CommonTableExpr, "ctecolnames"): Field.ANALYSIS,
+    (ast.CommonTableExpr, "ctecoltypes"): Field.ANALYSIS,
+    (ast.CommonTableExpr, "ctecoltypmods"): Field.ANALYSIS,
+    (ast.CommonTableExpr, "ctecolcollations"): Field.ANALYSIS,
+    (ast.BoolExpr, "args"): Field.NODES,
+    (ast.CaseExpr, "args"): Field.NODES,
+    (ast.CoalesceExpr, "args"): Field.NODES,
+    (ast.FuncCall, "args"): Field.NODES,
+    (ast.FuncCall, "agg_order"): Field.NODES,
+    (ast.GroupingSet, "content"): Field.NODES,
+    (ast.MinMaxExpr, "args"): Field.NODES,
+    (ast.ResTarget, "indirection"): Field.NODES,
+    (ast.RowExpr, "args"): Field.NODES,
+    (ast.SelectStmt, "distinctClause"): Field.NODES,
+    (ast.SelectStmt, "targetList"): Field.NODES,
+    (ast.SelectStmt, "fromClause"): Field.NODES,
+    (ast.SelectStmt, "groupClause"): Field.NODES,
+    (ast.SelectStmt, "windowClause"): Field.NODES,
+    (ast.SelectStmt, "valuesLists"): Field.NODES,
+    (ast.SelectStmt, "sortClause"): Field.NODES,
+    (ast.WindowDef, "partitionClause"): Field.NODES,
+    (ast.WindowDef, "orderClause"): Field.NODES,
+    (ast.WithClause, "ctes"): Field.NODES,
+}
+
+
+def test_fields_reviewed():
+    """Fails when an allowed node has a list or string field not reviewed above.
+
+    That happens after adding a node type to ALLOWED_NODES or upgrading pglast.
+    Decide what the new field holds, check it in the validator if Postgres
+    resolves it to code, and add it to REVIEWED_FIELDS.
+    """
+    fields = {
+        (cls, name)
+        for cls in ALLOWED_NODES
+        for name, info in cls.__slots__.items()
+        if info.c_type in ("List*", "char*")
+    }
+    assert fields == REVIEWED_FIELDS.keys()
