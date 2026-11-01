@@ -7,7 +7,9 @@ authors = [
     { name = "Wenqi He", email = "wenqihe2@illinois.edu" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pglast>=8.7",
+]
 
 [project.scripts]
 glint = "glint:main"
@@ -18,3 +20,8 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "glint"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
