@@ -41,6 +41,7 @@ dependencies = [
     { name = "openai" },
     { name = "pglast" },
     { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic" },
 ]
 
 [package.dev-dependencies]
@@ -53,6 +54,7 @@ requires-dist = [
     { name = "openai", specifier = ">=3.42.1" },
     { name = "pglast", specifier = ">=8.7" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
+    { name = "pydantic", specifier = ">=2.14.2" },
 ]
 
 [package.metadata.requires-dev]

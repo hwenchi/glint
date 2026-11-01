@@ -4,13 +4,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from pydantic import BaseModel, ValidationError
+
 from glint.engine import Engine, QueryError, Result
 from glint.serialize import result_json
 from glint.spec import UrlNotAllowed, reject_urls
 
 # Description before sql: models write arguments in schema order, so stating
 # the intent first works as a plan for the SQL.
-TOOL = {
+QUERY_TOOL = {
     "type": "function",
     "function": {
         "name": "query",
@@ -39,6 +41,27 @@ TOOL = {
         },
     },
 }
+
+
+class QueryArgs(BaseModel):
+    """Parses the query tool's arguments. QUERY_TOOL, written for the model, must match."""
+
+    description: str
+    sql: str
+    spec: dict[str, Any] | None = None
+
+
+class InvalidToolCall(Exception):
+    """The model's tool call doesn't fit QUERY_TOOL. The message is meant for the model."""
+
+
+def parse_arguments(name: str, arguments: str) -> QueryArgs:
+    if name != QUERY_TOOL["function"]["name"]:
+        raise InvalidToolCall(f"unknown tool {name}")
+    try:
+        return QueryArgs.model_validate_json(arguments)
+    except ValidationError as e:
+        raise InvalidToolCall(str(e)) from None
 
 
 @dataclass(frozen=True)
