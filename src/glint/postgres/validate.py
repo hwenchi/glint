@@ -70,6 +70,14 @@ class OperatorNotAllowed(Rejected):
         self.name = name
 
 
+class TypeNotAllowed(Rejected):
+    """A type qualified with a schema other than pg_catalog."""
+
+    def __init__(self, name: str):
+        super().__init__(f"type {name} is not allowed")
+        self.name = name
+
+
 # Built-in functions with no side effects. Functions that make a large value from
 # a small input (repeat, lpad, rpad) or concatenate a whole group (array_agg,
 # string_agg) are left out, because the timeout doesn't bound memory.
@@ -154,6 +162,8 @@ ALLOWED_NODES = frozenset({
     ast.WindowDef,
     ast.A_Expr,
     ast.FuncCall,
+    ast.TypeCast,
+    ast.TypeName,
 })
 
 
@@ -204,11 +214,13 @@ def _check_node(node: ast.Node) -> None:
         case ast.A_Expr(kind=kind) if kind not in ALLOWED_EXPR_KINDS:
             raise NotAllowed(kind.name)
         case ast.A_Expr(kind=kind, name=names) if kind not in BETWEEN_KINDS:
-            _check_operator(names)
+            _check_builtin(names, OperatorNotAllowed)
         case ast.SubLink(operName=names) if names:
-            _check_operator(names)
+            _check_builtin(names, OperatorNotAllowed)
         case ast.SortBy(useOp=names) if names:
-            _check_operator(names)
+            _check_builtin(names, OperatorNotAllowed)
+        case ast.TypeName(names=names):
+            _check_builtin(names, TypeNotAllowed)
 
 
 def _check_function(names: tuple[ast.String, ...]) -> None:
@@ -219,11 +231,15 @@ def _check_function(names: tuple[ast.String, ...]) -> None:
             raise FunctionNotAllowed(".".join(parts))
 
 
-def _check_operator(names: tuple[ast.String, ...]) -> None:
-    # Only the schema is checked: the executor pins search_path to pg_catalog,
-    # where every operator is built-in and has no side effects.
+def _check_builtin(names: tuple[ast.String, ...], error: type[Rejected]) -> None:
+    """Reject a name qualified with a schema other than pg_catalog.
+
+    For operators and types only the schema is checked: the executor pins
+    search_path to pg_catalog, where every operator and type is built-in and
+    has no side effects.
+    """
     match [n.sval for n in names]:
         case [_] | ["pg_catalog", _]:
             return
         case parts:
-            raise OperatorNotAllowed(".".join(parts))
+            raise error(".".join(parts))

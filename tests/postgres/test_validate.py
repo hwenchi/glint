@@ -16,6 +16,7 @@ from glint.postgres.validate import (
     RecursiveCTE,
     SelectInto,
     StatementCount,
+    TypeNotAllowed,
     validate,
 )
 
@@ -57,6 +58,10 @@ from glint.postgres.validate import (
         "SELECT a FROM t WHERE a IN (SELECT b FROM u) AND a < ALL (SELECT b FROM u)",
         "SELECT a FROM t ORDER BY a USING <",
         "SELECT a FROM t ORDER BY a USING OPERATOR(pg_catalog.<)",
+        # casts
+        "SELECT a::int, CAST(b AS varchar(3)), c::numeric(10, 2)[] FROM t",
+        "SELECT a::pg_catalog.text, a::regclass FROM t",
+        "SELECT a FROM t WHERE d > date '2024-01-01' - interval '1 day'",
         "SELECT " + " + ".join(["1"] * 5000),
     ],
 )
@@ -108,8 +113,7 @@ def test_rejects(sql, error):
         ("SELECT a FROM XMLTABLE('/a' PASSING '<a/>' COLUMNS a int)", "RangeTableFunc"),
         ("SELECT $1", "ParamRef"),
         ("SELECT a FROM t WHERE s SIMILAR TO 'x%'", "AEXPR_SIMILAR"),
-        # not yet allowed: casts, functions in FROM
-        ("SELECT a::int FROM t", "TypeCast"),
+        # not yet allowed: functions in FROM
         ("SELECT a FROM generate_series(1, 10) AS a", "RangeFunction"),
     ],
 )
@@ -168,11 +172,30 @@ def test_operator_not_allowed(sql, name):
     assert e.value.name == name
 
 
+@pytest.mark.parametrize(
+    "sql, name",
+    [
+        ("SELECT a::public.mytype FROM t", "public.mytype"),
+        ("SELECT CAST(a AS public.mytype) FROM t", "public.mytype"),
+        ("SELECT public.mytype 'x'", "public.mytype"),
+        ("SELECT a::db.pg_catalog.int4 FROM t", "db.pg_catalog.int4"),
+        # nested inside allowed constructs
+        ("SELECT count(a::public.mytype) FROM t", "public.mytype"),
+        ("SELECT a FROM t WHERE a IN (b::public.mytype)", "public.mytype"),
+    ],
+)
+def test_type_not_allowed(sql, name):
+    with pytest.raises(TypeNotAllowed) as e:
+        validate(sql)
+    assert e.value.name == name
+
+
 class Field(Enum):
     """What a list or string field of a node holds."""
 
     OPERATOR = auto()  # resolved to code: checked by the validator
     FUNCTION = auto()  # resolved to code: checked by the validator
+    TYPE = auto()  # resolved to code: checked by the validator
     TABLE = auto()  # checked against the catalog
     REJECTED = auto()  # the validator rejects the node if set
     COLUMN = auto()
@@ -187,6 +210,9 @@ REVIEWED_FIELDS = {
     (ast.SubLink, "operName"): Field.OPERATOR,
     (ast.SortBy, "useOp"): Field.OPERATOR,
     (ast.FuncCall, "funcname"): Field.FUNCTION,
+    (ast.TypeName, "names"): Field.TYPE,
+    (ast.TypeName, "typmods"): Field.NODES,
+    (ast.TypeName, "arrayBounds"): Field.NODES,
     (ast.RangeVar, "schemaname"): Field.TABLE,
     (ast.RangeVar, "relname"): Field.TABLE,
     (ast.RangeVar, "catalogname"): Field.REJECTED,
