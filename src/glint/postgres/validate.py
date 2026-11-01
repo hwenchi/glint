@@ -108,6 +108,8 @@ ALLOWED_FUNCTIONS = {
     "make_date", "make_time", "make_timestamp", "make_interval", "isfinite",
     "justify_days", "justify_hours", "justify_interval",
     "to_char", "to_date", "to_timestamp", "to_number",
+    # sets and arrays
+    "generate_series", "unnest", "array_length", "cardinality",
 }
 
 # Their name is the keyword, not an operator. Postgres rewrites them to >= and <=.
@@ -164,6 +166,7 @@ ALLOWED_NODES = frozenset({
     ast.FuncCall,
     ast.TypeCast,
     ast.TypeName,
+    ast.RangeFunction,
 })
 
 

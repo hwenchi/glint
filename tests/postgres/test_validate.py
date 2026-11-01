@@ -62,6 +62,11 @@ from glint.postgres.validate import (
         "SELECT a::int, CAST(b AS varchar(3)), c::numeric(10, 2)[] FROM t",
         "SELECT a::pg_catalog.text, a::regclass FROM t",
         "SELECT a FROM t WHERE d > date '2024-01-01' - interval '1 day'",
+        # functions in FROM
+        "SELECT a FROM generate_series(1, 10) AS a",
+        "SELECT * FROM generate_series(1, 10) WITH ORDINALITY AS a(v, n)",
+        "SELECT * FROM ROWS FROM (generate_series(1, 3), unnest(b)) AS a",
+        "SELECT * FROM t, LATERAL generate_series(1, t.n) AS a",
         "SELECT " + " + ".join(["1"] * 5000),
     ],
 )
@@ -113,8 +118,7 @@ def test_rejects(sql, error):
         ("SELECT a FROM XMLTABLE('/a' PASSING '<a/>' COLUMNS a int)", "RangeTableFunc"),
         ("SELECT $1", "ParamRef"),
         ("SELECT a FROM t WHERE s SIMILAR TO 'x%'", "AEXPR_SIMILAR"),
-        # not yet allowed: functions in FROM
-        ("SELECT a FROM generate_series(1, 10) AS a", "RangeFunction"),
+        ("SELECT * FROM unnest(b) AS x(a int)", "ColumnDef"),
     ],
 )
 def test_not_allowed(sql, construct):
@@ -143,6 +147,11 @@ def test_not_allowed(sql, construct):
         ('SELECT "COUNT"(*) FROM t', "COUNT"),
         # nested inside an allowed function
         ("SELECT count(pg_sleep(1)) FROM t", "pg_sleep"),
+        # in FROM
+        ("SELECT * FROM pg_sleep(10)", "pg_sleep"),
+        ("SELECT * FROM public.f() AS x", "public.f"),
+        ("SELECT * FROM ROWS FROM (generate_series(1, 3), pg_sleep(10)) AS a", "pg_sleep"),
+        ("SELECT * FROM generate_series(1, pg_sleep(1)::int) AS a", "pg_sleep"),
     ],
 )
 def test_function_not_allowed(sql, name):
@@ -238,6 +247,8 @@ REVIEWED_FIELDS = {
     (ast.CoalesceExpr, "args"): Field.NODES,
     (ast.FuncCall, "args"): Field.NODES,
     (ast.FuncCall, "agg_order"): Field.NODES,
+    (ast.RangeFunction, "functions"): Field.NODES,
+    (ast.RangeFunction, "coldeflist"): Field.NODES,
     (ast.GroupingSet, "content"): Field.NODES,
     (ast.MinMaxExpr, "args"): Field.NODES,
     (ast.ResTarget, "indirection"): Field.NODES,
