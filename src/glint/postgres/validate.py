@@ -1,13 +1,19 @@
 """Static check that a query is a single read-only SELECT.
 
-Functions and operators are checked by name, so the query must run with
-search_path pinned to pg_catalog, pg_temp. Otherwise an unqualified name can
-resolve to a user-defined object in another schema.
+This guards against what the agent writes, not against the database: objects
+in it are trusted as much as any client of the database trusts them.
+Unqualified names resolve through the session's search_path as usual.
+
+Functions must be on an allowlist, because pg_catalog itself has ones with side
+effects. Operators and types may be anything except a name the agent qualifies
+with a schema other than pg_catalog, which would pick user code explicitly.
 """
 
 from pglast import ast, parse_sql
 from pglast.enums import A_Expr_Kind
 from pglast.parser import ParseError
+
+from glint.postgres.tree import walk
 
 
 class Rejected(ValueError):
@@ -181,20 +187,9 @@ def validate(sql: str) -> ast.SelectStmt:
     stmt = stmts[0].stmt
     if not isinstance(stmt, ast.SelectStmt):
         raise NotSelect(f"only SELECT is allowed, got {type(stmt).__name__}")
-    _check_tree(stmt)
+    for node in walk(stmt):
+        _check_node(node)
     return stmt
-
-
-def _check_tree(root: ast.Node) -> None:
-    """Check every node, iteratively since parse trees can be thousands deep."""
-    stack = [root]
-    while stack:
-        value = stack.pop()
-        if isinstance(value, (list, tuple)):
-            stack.extend(value)
-        elif isinstance(value, ast.Node):
-            _check_node(value)
-            stack.extend(getattr(value, name) for name in value)
 
 
 def _check_node(node: ast.Node) -> None:
@@ -237,9 +232,9 @@ def _check_function(names: tuple[ast.String, ...]) -> None:
 def _check_builtin(names: tuple[ast.String, ...], error: type[Rejected]) -> None:
     """Reject a name qualified with a schema other than pg_catalog.
 
-    For operators and types only the schema is checked: the executor pins
-    search_path to pg_catalog, where every operator and type is built-in and
-    has no side effects.
+    For operators and types only the schema is checked: built-in ones have no
+    side effects, and an unqualified name resolves to whatever the database
+    defines for it, which is trusted.
     """
     match [n.sval for n in names]:
         case [_] | ["pg_catalog", _]:
