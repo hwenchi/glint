@@ -29,13 +29,18 @@ class Result(NamedTuple):
 
 def run(
     conn: psycopg.Connection,
-    stmt: ast.SelectStmt,
+    stmt: ast.SelectStmt | ast.ExplainStmt,
     max_rows: int,
     timeout: timedelta,
 ) -> Result:
     """Run a validated statement, failing rather than truncating past max_rows."""
+    match stmt:
+        case ast.ExplainStmt():
+            sql = RawStream()(stmt)  # can't be wrapped, and a plan is small
+        case ast.SelectStmt():
+            sql = with_limit(stmt, max_rows + 1)
     with _transaction(conn, timeout):
-        cur = conn.execute(with_limit(stmt, max_rows + 1))
+        cur = conn.execute(sql)
         rows = cur.fetchall()
         columns = [d.name for d in cur.description]
     if len(rows) > max_rows:

@@ -57,6 +57,20 @@ def test_run_times_out(conn):
         run(conn, stmt, 10, timedelta(milliseconds=100))
 
 
+def test_run_explain(conn):
+    stmt = validate("EXPLAIN (FORMAT JSON) SELECT * FROM rental ORDER BY rental_date")
+    result = run(conn, stmt, 10, TIMEOUT)
+    assert result.columns == ["QUERY PLAN"]
+    [[plan]] = result.rows
+    assert "Plan" in plan[0]
+
+
+def test_run_explain_analyze_times_out(conn):
+    stmt = validate("EXPLAIN ANALYZE SELECT count(*) FROM generate_series(1, 1000000000)")
+    with pytest.raises(psycopg.errors.QueryCanceled):
+        run(conn, stmt, 10, timedelta(milliseconds=100))
+
+
 def test_run_leaves_connection_idle(conn):
     run(conn, validate("SELECT 1"), 10, TIMEOUT)
     assert conn.info.transaction_status == TransactionStatus.IDLE

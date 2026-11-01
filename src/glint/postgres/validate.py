@@ -173,10 +173,12 @@ ALLOWED_NODES = frozenset({
     ast.TypeCast,
     ast.TypeName,
     ast.RangeFunction,
+    ast.ExplainStmt,
+    ast.DefElem,  # EXPLAIN options, which only change what is reported
 })
 
 
-def validate(sql: str) -> ast.SelectStmt:
+def validate(sql: str) -> ast.SelectStmt | ast.ExplainStmt:
     """Return the parsed statement, or raise Rejected."""
     try:
         stmts = parse_sql(sql)
@@ -185,8 +187,13 @@ def validate(sql: str) -> ast.SelectStmt:
     if len(stmts) != 1:
         raise StatementCount(f"expected exactly one statement, got {len(stmts)}")
     stmt = stmts[0].stmt
-    if not isinstance(stmt, ast.SelectStmt):
-        raise NotSelect(f"only SELECT is allowed, got {type(stmt).__name__}")
+    match stmt:
+        case ast.SelectStmt() | ast.ExplainStmt(query=ast.SelectStmt()):
+            pass
+        case ast.ExplainStmt(query=query):
+            raise NotSelect(f"only EXPLAIN SELECT is allowed, got EXPLAIN {type(query).__name__}")
+        case _:
+            raise NotSelect(f"only SELECT is allowed, got {type(stmt).__name__}")
     for node in walk(stmt):
         _check_node(node)
     return stmt

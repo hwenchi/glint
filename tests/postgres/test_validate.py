@@ -67,6 +67,10 @@ from glint.postgres.validate import (
         "SELECT * FROM generate_series(1, 10) WITH ORDINALITY AS a(v, n)",
         "SELECT * FROM ROWS FROM (generate_series(1, 3), unnest(b)) AS a",
         "SELECT * FROM t, LATERAL generate_series(1, t.n) AS a",
+        # EXPLAIN
+        "EXPLAIN SELECT a FROM t",
+        "EXPLAIN ANALYZE SELECT a FROM t",
+        "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) SELECT a FROM t WHERE a = 1",
         "SELECT " + " + ".join(["1"] * 5000),
     ],
 )
@@ -92,6 +96,8 @@ def test_accepts_deep_nesting():
         ("SET search_path = public", NotSelect),
         ("COPY t TO '/tmp/x'", NotSelect),
         ("EXPLAIN ANALYZE DELETE FROM t", NotSelect),
+        ("EXPLAIN SELECT a INTO u FROM t", SelectInto),
+        ("EXPLAIN ANALYZE SELECT a FROM t FOR UPDATE", LockingClause),
         ("SELEC 1", InvalidSyntax),
         # writes and locks hidden inside a SELECT
         ("SELECT a INTO u FROM t", SelectInto),
@@ -147,6 +153,7 @@ def test_not_allowed(sql, construct):
         ('SELECT "COUNT"(*) FROM t', "COUNT"),
         # nested inside an allowed function
         ("SELECT count(pg_sleep(1)) FROM t", "pg_sleep"),
+        ("EXPLAIN ANALYZE SELECT pg_sleep(10)", "pg_sleep"),
         # in FROM
         ("SELECT * FROM pg_sleep(10)", "pg_sleep"),
         ("SELECT * FROM public.f() AS x", "public.f"),
@@ -210,6 +217,7 @@ class Field(Enum):
     COLUMN = auto()
     LOCAL_NAME = auto()  # alias, CTE, window or output column name
     LITERAL = auto()
+    OPTION = auto()  # a statement option name, e.g. EXPLAIN's ANALYZE
     ANALYSIS = auto()  # filled by parse analysis, empty in a raw parse tree
     NODES = auto()  # child nodes, each checked by the walker
 
@@ -236,6 +244,9 @@ REVIEWED_FIELDS = {
     (ast.RowExpr, "colnames"): Field.LOCAL_NAME,
     (ast.WindowDef, "name"): Field.LOCAL_NAME,
     (ast.WindowDef, "refname"): Field.LOCAL_NAME,
+    (ast.DefElem, "defname"): Field.OPTION,
+    (ast.DefElem, "defnamespace"): Field.OPTION,
+    (ast.ExplainStmt, "options"): Field.NODES,
     (ast.String, "sval"): Field.LITERAL,
     (ast.Float, "fval"): Field.LITERAL,
     (ast.CommonTableExpr, "ctecolnames"): Field.ANALYSIS,
