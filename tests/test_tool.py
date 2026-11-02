@@ -2,57 +2,43 @@ import json
 
 import pytest
 
-from glint.engine import QueryError, Result
-from glint.tool import QUERY_TOOL, InvalidToolCall, QueryArgs, call, parse_arguments
-
-RESULT = Result(["rating", "n"], [("G", 178)])
-
-
-class FakeEngine:
-    def __init__(self, result=RESULT, error=None):
-        self.result = result
-        self.error = error
-        self.queries = []
-
-    def query(self, sql):
-        self.queries.append(sql)
-        if self.error:
-            raise self.error
-        return self.result
+from fakes import RESULT, FakeEngine
+from glint.engine import QueryError
+from glint.tool import QUERY_TOOL, InvalidToolCall, QueryArgs, parse_arguments, run_query
 
 
-def test_call():
+def test_run_query():
     engine = FakeEngine()
-    c = call(engine, "Films per rating", "SELECT rating, count(*) AS n FROM film GROUP BY rating")
+    run = run_query(engine, "Films per rating", "SELECT rating, count(*) AS n FROM film GROUP BY rating")
     assert engine.queries == ["SELECT rating, count(*) AS n FROM film GROUP BY rating"]
-    assert (c.result, c.error, c.spec) == (RESULT, None, None)
-    assert json.loads(c.content()) == {"columns": ["rating", "n"], "rows": [["G", 178]]}
+    assert (run.result, run.error, run.spec) == (RESULT, None, None)
+    assert json.loads(run.content()) == {"columns": ["rating", "n"], "rows": [["G", 178]]}
 
 
-def test_call_with_spec_gets_description():
+def test_run_query_with_spec_gets_description():
     spec = {"mark": "bar"}
-    c = call(FakeEngine(), "Films per rating", "SELECT 1", spec)
-    assert c.spec == {"description": "Films per rating", "mark": "bar"}
+    run = run_query(FakeEngine(), "Films per rating", "SELECT 1", spec)
+    assert run.spec == {"description": "Films per rating", "mark": "bar"}
     assert spec == {"mark": "bar"}
 
 
-def test_call_keeps_spec_description():
-    c = call(FakeEngine(), "Films per rating", "SELECT 1", {"description": "Own", "mark": "bar"})
-    assert c.spec["description"] == "Own"
+def test_run_query_keeps_spec_description():
+    run = run_query(FakeEngine(), "Films per rating", "SELECT 1", {"description": "Own", "mark": "bar"})
+    assert run.spec["description"] == "Own"
 
 
-def test_url_fails_the_call_without_querying():
+def test_url_fails_the_run_without_querying():
     engine = FakeEngine()
-    c = call(engine, "Films", "SELECT 1", {"mark": "bar", "encoding": {"href": {"field": "x"}}})
+    run = run_query(engine, "Films", "SELECT 1", {"mark": "bar", "encoding": {"href": {"field": "x"}}})
     assert engine.queries == []
-    assert c.result is None
-    assert c.content().startswith("error: $.encoding.href:")
+    assert run.result is None
+    assert run.content().startswith("error: $.encoding.href:")
 
 
 def test_query_error():
-    c = call(FakeEngine(error=QueryError('column "nope" does not exist')), "Films", "SELECT nope")
-    assert c.result is None
-    assert c.content() == 'error: column "nope" does not exist'
+    run = run_query(FakeEngine(error=QueryError('column "nope" does not exist')), "Films", "SELECT nope")
+    assert run.result is None
+    assert run.content() == 'error: column "nope" does not exist'
 
 
 def test_tool_matches_args():

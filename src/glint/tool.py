@@ -65,7 +65,9 @@ def parse_arguments(name: str, arguments: str) -> QueryArgs:
 
 
 @dataclass(frozen=True)
-class Call:
+class QueryRun:
+    """One attempt to run a query: what was asked, when, and its result or error."""
+
     description: str
     sql: str
     spec: dict[str, Any] | None
@@ -78,7 +80,9 @@ class Call:
         return f"error: {self.error}" if self.error is not None else result_json(self.result)
 
 
-def call(engine: Engine, description: str, sql: str, spec: dict[str, Any] | None = None) -> Call:
+def run_query(
+    engine: Engine, description: str, sql: str, spec: dict[str, Any] | None = None
+) -> QueryRun:
     at = datetime.now(UTC)
     try:
         if spec is not None:
@@ -86,5 +90,5 @@ def call(engine: Engine, description: str, sql: str, spec: dict[str, Any] | None
             reject_urls(spec)
         result = engine.query(sql)
     except (QueryError, UrlNotAllowed) as e:
-        return Call(description, sql, spec, at, None, str(e))
-    return Call(description, sql, spec, at, result, None)
+        return QueryRun(description, sql, spec, at, None, str(e))
+    return QueryRun(description, sql, spec, at, result, None)
