@@ -18,7 +18,9 @@ TOKEN_COOKIE = "glint_token"
 CSP = "; ".join([
     "default-src 'none'",  # anything not allowed below is blocked
     "script-src 'self'",  # only Glint's own scripts: no inline code, no eval, no CDNs
-    "style-src 'self'",  # only Glint's own stylesheets
+    # Inline styles too: Vega's libraries inject <style> tags. CSS can't send data
+    # out, since every URL it could load is still blocked by the other directives.
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self'",  # no images from elsewhere, whose URLs could carry data out
     "connect-src 'self'",  # fetch only Glint's API
     "base-uri 'none'",  # no <base> tag redirecting the page's relative URLs

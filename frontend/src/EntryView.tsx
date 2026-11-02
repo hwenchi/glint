@@ -31,9 +31,19 @@ function QueryRunView({ run }: { run: QueryRun }) {
     <section>
       <p>[query] {run.description}</p>
       <p>{new Date(run.at).toLocaleString()}</p>
-      <pre>{run.sql}</pre>
+      <details>
+        <summary>SQL</summary>
+        <pre>{run.sql}</pre>
+      </details>
       {run.spec && run.result && <Chart spec={run.spec} result={run.result} />}
-      {run.result ? <ResultTable result={run.result} /> : <p>[error] {run.error}</p>}
+      {run.result ? (
+        <details>
+          <summary>Table ({run.result.rows.length} rows)</summary>
+          <ResultTable result={run.result} />
+        </details>
+      ) : (
+        <p>[error] {run.error}</p>
+      )}
     </section>
   );
 }
