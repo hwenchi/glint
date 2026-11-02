@@ -32,7 +32,11 @@ QUERY_TOOL = {
                     "description": (
                         "Optional Vega-Lite spec charting the result. Don't include data:"
                         " the query's result becomes the chart's data, replacing any"
-                        " top-level data in the spec. Omit for lookups and checks."
+                        " top-level data in the spec. Fields must be the result's column"
+                        " names. Omit for lookups and checks. Example:"
+                        ' {"mark": "line", "encoding": {'
+                        '"x": {"field": "month", "type": "temporal"},'
+                        ' "y": {"field": "total", "type": "quantitative", "title": "Total payments"}}}'
                     ),
                 },
             },
