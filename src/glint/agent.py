@@ -6,11 +6,14 @@ from openai import OpenAI
 
 from glint.engine import Engine
 from glint.history import AssistantMessage, Entry, InvalidCall, QueryResult, ToolCall, UserMessage, from_api, to_api
+from glint.prompt import SYSTEM_PROMPT
 from glint.tool import QUERY_TOOL, InvalidToolCall, parse_arguments, run_query
 
 # Model requests per user message, so a model that keeps calling the tool
 # can't run forever.
 MAX_STEPS = 20
+
+SYSTEM_MESSAGE = {"role": "system", "content": SYSTEM_PROMPT}
 
 
 class Session:
@@ -34,11 +37,8 @@ class Session:
         """
         yield self._add(UserMessage(text))
         for _ in range(MAX_STEPS):
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[to_api(entry) for entry in self._history],
-                tools=[QUERY_TOOL],
-            )
+            messages = [SYSTEM_MESSAGE] + [to_api(entry) for entry in self._history]
+            response = self.client.chat.completions.create(model=self.model, messages=messages, tools=[QUERY_TOOL])
             reply = self._add(from_api(response.choices[0].message))
             yield reply
             if not reply.tool_calls:

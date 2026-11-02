@@ -2,7 +2,7 @@ import json
 
 from fakes import RESULT, FakeEndpoint, FakeEngine
 from glint import agent
-from glint.agent import Session, run_tool_call
+from glint.agent import SYSTEM_MESSAGE, Session, run_tool_call
 from glint.history import AssistantMessage, InvalidCall, QueryResult, ToolCall, UserMessage
 from glint.tool import QUERY_TOOL
 
@@ -18,7 +18,7 @@ def test_respond_without_tool_calls():
     assert list(session.history) == entries
     [request] = endpoint.requests
     assert request["model"] == "fake-model"
-    assert request["messages"] == [{"role": "user", "content": "How many G films?"}]
+    assert request["messages"] == [SYSTEM_MESSAGE, {"role": "user", "content": "How many G films?"}]
     assert request["tools"] == [QUERY_TOOL]
 
 
@@ -32,7 +32,7 @@ def test_respond_with_tool_call():
     assert entries[2].run.result == RESULT
     assert engine.queries == ["SELECT 1"]
     # The second request carries the call and its result, and nothing the model shouldn't see.
-    tool_message = endpoint.requests[1]["messages"][2]
+    tool_message = endpoint.requests[1]["messages"][3]
     assert tool_message.keys() == {"role", "tool_call_id", "content"}
     assert json.loads(tool_message["content"]) == {"columns": ["rating", "n"], "rows": [["G", 178]]}
 
@@ -42,7 +42,8 @@ def test_respond_keeps_earlier_turns():
     session = Session(endpoint.client(), "fake-model", FakeEngine())
     list(session.respond("first"))
     list(session.respond("second"))
-    assert [m["content"] for m in endpoint.requests[1]["messages"]] == ["first", ANSWER.text, "second"]
+    assert endpoint.requests[1]["messages"][0] == SYSTEM_MESSAGE
+    assert [m["content"] for m in endpoint.requests[1]["messages"][1:]] == ["first", ANSWER.text, "second"]
 
 
 def test_respond_stops_after_max_steps(monkeypatch):
