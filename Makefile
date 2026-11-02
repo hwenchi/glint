@@ -7,7 +7,15 @@ COMPOSE := docker compose -f tests/db/compose.yaml
 export GLINT_TEST_DB_PORT ?= 15432
 export GLINT_TEST_DATABASE_URL := postgresql://postgres:postgres@127.0.0.1:$(GLINT_TEST_DB_PORT)/pagila
 
-.PHONY: test image pagila db db-down db-reset
+.PHONY: test image pagila db db-down db-reset types
+.DEFAULT_GOAL := test
+
+# The frontend's API types, generated from the server's OpenAPI schema.
+types:
+	uv run python -m glint.openapi > frontend/openapi.json
+	cd frontend && npm run types
+
+# Everything below is for testing.
 
 test: db
 	uv run pytest

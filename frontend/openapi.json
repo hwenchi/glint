@@ -1,0 +1,370 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/history": {
+      "get": {
+        "summary": "Get History",
+        "operationId": "get_history_api_history_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/UserMessage"
+                      },
+                      {
+                        "$ref": "#/components/schemas/AssistantMessage"
+                      },
+                      {
+                        "$ref": "#/components/schemas/QueryResult"
+                      },
+                      {
+                        "$ref": "#/components/schemas/InvalidCall"
+                      }
+                    ],
+                    "discriminator": {
+                      "propertyName": "kind",
+                      "mapping": {
+                        "user": "#/components/schemas/UserMessage",
+                        "assistant": "#/components/schemas/AssistantMessage",
+                        "query_result": "#/components/schemas/QueryResult",
+                        "invalid_call": "#/components/schemas/InvalidCall"
+                      }
+                    }
+                  },
+                  "type": "array",
+                  "title": "Response Get History Api History Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Add Message",
+        "description": "Add the user's message and stream the turn's entries as server-sent events as they arrive.",
+        "operationId": "add_message_api_history_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssistantMessage": {
+        "properties": {
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "type": "array",
+            "title": "Tool Calls",
+            "default": []
+          },
+          "kind": {
+            "type": "string",
+            "const": "assistant",
+            "title": "Kind",
+            "default": "assistant"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "AssistantMessage"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InvalidCall": {
+        "properties": {
+          "tool_call_id": {
+            "type": "string",
+            "title": "Tool Call Id"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "kind": {
+            "type": "string",
+            "const": "invalid_call",
+            "title": "Kind",
+            "default": "invalid_call"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_call_id",
+          "error"
+        ],
+        "title": "InvalidCall",
+        "description": "The answer to a tool call that couldn't be parsed."
+      },
+      "NewMessage": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "NewMessage"
+      },
+      "QueryResult": {
+        "properties": {
+          "tool_call_id": {
+            "type": "string",
+            "title": "Tool Call Id"
+          },
+          "run": {
+            "$ref": "#/components/schemas/QueryRun"
+          },
+          "kind": {
+            "type": "string",
+            "const": "query_result",
+            "title": "Kind",
+            "default": "query_result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool_call_id",
+          "run"
+        ],
+        "title": "QueryResult",
+        "description": "The answer to a tool call that ran a query."
+      },
+      "QueryRun": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "sql": {
+            "type": "string",
+            "title": "Sql"
+          },
+          "spec": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spec"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Result"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "description",
+          "sql",
+          "spec",
+          "at",
+          "result",
+          "error"
+        ],
+        "title": "QueryRun",
+        "description": "One attempt to run a query: what was asked, when, and its result or error."
+      },
+      "Result": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "rows": {
+            "items": {
+              "items": {},
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "title": "Result",
+        "description": "A query result whose values are plain JSON."
+      },
+      "ToolCall": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "arguments": {
+            "type": "string",
+            "title": "Arguments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "arguments"
+        ],
+        "title": "ToolCall"
+      },
+      "UserMessage": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "kind": {
+            "type": "string",
+            "const": "user",
+            "title": "Kind",
+            "default": "user"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "UserMessage"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
