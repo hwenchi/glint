@@ -3,13 +3,23 @@
 import secrets
 
 from fastapi import FastAPI, Request
-from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse, StreamingResponse
+from pydantic import BaseModel, TypeAdapter
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+from glint.agent import Session
+from glint.history import Entry
 
 TOKEN_COOKIE = "glint_token"
 
+ENTRY = TypeAdapter(Entry)
 
-def create_app(token: str, port: int) -> FastAPI:
+
+class NewMessage(BaseModel):
+    text: str
+
+
+def create_app(session: Session, token: str, port: int) -> FastAPI:
     # No OpenAPI or docs routes: the docs page loads scripts from a CDN, which
     # the CSP forbids. The schema is still available as app.openapi().
     app = FastAPI(openapi_url=None)
@@ -45,5 +55,16 @@ def create_app(token: str, port: int) -> FastAPI:
 
     # Against DNS rebinding: another site's hostname pointed at 127.0.0.1.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+
+    @app.get("/api/history", response_model=list[Entry])
+    def get_history():
+        return list(session.history)
+
+    @app.post("/api/history")
+    def add_message(message: NewMessage):
+        """Add the user's message and stream the turn's entries as server-sent events as they arrive."""
+        entries = session.respond(message.text)
+        events = (b"data: " + ENTRY.dump_json(entry) + b"\n\n" for entry in entries)
+        return StreamingResponse(events, media_type="text/event-stream")
 
     return app

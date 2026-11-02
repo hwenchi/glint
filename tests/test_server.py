@@ -1,6 +1,11 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
+from fakes import FakeEndpoint, FakeEngine
+from glint.agent import Session
+from glint.history import AssistantMessage
 from glint.server import TOKEN_COOKIE, create_app
 
 TOKEN = "secret-token"
@@ -9,8 +14,14 @@ ORIGIN = f"http://127.0.0.1:{PORT}"
 
 
 @pytest.fixture
-def client():
-    app = create_app(TOKEN, PORT)
+def session():
+    endpoint = FakeEndpoint(AssistantMessage("Hello."))
+    return Session(endpoint.client(), "fake-model", FakeEngine())
+
+
+@pytest.fixture
+def client(session):
+    app = create_app(session, TOKEN, PORT)
     app.get("/ping")(lambda: "pong")
     app.post("/ping")(lambda: "pong")
     return TestClient(app, base_url=ORIGIN, follow_redirects=False)
@@ -65,3 +76,20 @@ def test_post_from_the_page(logged_in, origin):
 def test_post_from_elsewhere(logged_in, origin):
     headers = {"origin": origin} if origin else {}
     assert logged_in.post("/ping", headers=headers).status_code == 403
+
+
+def test_history_starts_empty(logged_in):
+    assert logged_in.get("/api/history").json() == []
+
+
+def test_message_streams_the_turn(logged_in):
+    response = logged_in.post("/api/history", json={"text": "Hi"}, headers={"origin": ORIGIN})
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = response.text.split("\n\n")[:-1]  # each event ends with a blank line
+    assert all(event.startswith("data: ") for event in events)
+    entries = [json.loads(event.removeprefix("data: ")) for event in events]
+    assert entries == [
+        {"kind": "user", "text": "Hi"},
+        {"kind": "assistant", "text": "Hello.", "tool_calls": []},
+    ]
+    assert logged_in.get("/api/history").json() == entries

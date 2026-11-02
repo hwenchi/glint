@@ -1,4 +1,5 @@
 import json
+import threading
 
 from fakes import RAW_RESULT, FakeEndpoint, FakeEngine
 from glint import agent
@@ -47,6 +48,29 @@ def test_stopping_early_leaves_valid_history():
     assert next(turn) == AssistantMessage(None, (CALL,))
     turn.close()
     assert [type(e) for e in session.history] == [UserMessage, AssistantMessage, QueryResult]
+
+
+def test_turns_wait_for_each_other():
+    endpoint = FakeEndpoint(ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine())
+    first = session.respond("first")
+    next(first)  # the first turn has started
+    second = threading.Thread(target=lambda: list(session.respond("second")))
+    second.start()
+    second.join(timeout=0.2)
+    assert second.is_alive()  # waiting for the first turn
+    assert list(session.history) == [UserMessage("first")]
+    list(first)
+    second.join(timeout=5)
+    assert [e.text for e in session.history] == ["first", ANSWER.text, "second", ANSWER.text]
+
+
+def test_closing_a_turn_lets_the_next_run():
+    session = Session(FakeEndpoint(ANSWER).client(), "fake-model", FakeEngine())
+    first = session.respond("first")
+    next(first)
+    first.close()
+    assert list(session.respond("second"))[0] == UserMessage("second")
 
 
 def test_respond_keeps_earlier_turns():
