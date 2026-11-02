@@ -1,0 +1,51 @@
+"""The glint command: start a session and serve it on localhost."""
+
+import secrets
+import socket
+import sys
+import webbrowser
+from datetime import timedelta
+from pathlib import Path
+
+import psycopg
+import uvicorn
+from openai import OpenAI
+from pydantic import ValidationError
+
+from glint.agent import Session
+from glint.config import load_config
+from glint.postgres.engine import PostgresEngine
+from glint.server import create_app
+
+MAX_ROWS = 500
+TIMEOUT = timedelta(seconds=30)
+
+
+def main() -> None:
+    path = Path(sys.argv[1] if len(sys.argv) > 1 else "glint.toml")
+    try:
+        config = load_config(path)
+    except FileNotFoundError:
+        sys.exit(f"No config at {path}: copy glint.example.toml to glint.toml and fill it in.")
+    except ValidationError as e:
+        sys.exit(f"Invalid config in {path}:\n{e}")
+    try:
+        conn = psycopg.connect(config.database.connection)
+    except psycopg.OperationalError as e:
+        sys.exit(f"Can't connect to the database: {e}")
+
+    engine = PostgresEngine(conn, MAX_ROWS, TIMEOUT)
+    client = OpenAI(base_url=config.model.base_url, api_key=config.model.api_key)
+    session = Session(client, config.model.name, engine)
+
+    # Bind first so the OS picks a free port, which the app needs for its origin check.
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    token = secrets.token_urlsafe(32)
+    app = create_app(session, token, port)
+
+    url = f"http://127.0.0.1:{port}/?token={token}"
+    print(f"Glint is running at {url}", flush=True)
+    webbrowser.open(url)
+    uvicorn.Server(uvicorn.Config(app, log_level="warning")).run(sockets=[sock])

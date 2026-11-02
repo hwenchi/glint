@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from glint-viz!")
+"""Glint: find the insights hiding in your data."""
