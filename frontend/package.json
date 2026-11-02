@@ -10,6 +10,8 @@
     "eventsource-parser": "4.1.2",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
     "vega": "6.4.0",
     "vega-embed": "7.3.0",
     "vega-interpreter": "2.3.2",

@@ -1,3 +1,6 @@
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 import type { Entry, QueryRun, Result } from "./types";
 
 export function EntryView({ entry }: { entry: Entry }) {
@@ -6,7 +9,15 @@ export function EntryView({ entry }: { entry: Entry }) {
       return <p>[user] {entry.text}</p>;
     case "assistant":
       // A reply that only calls the tool has no text; its queries show as their own entries.
-      return entry.text ? <p>[assistant] {entry.text}</p> : null;
+      return entry.text ? (
+        <div>
+          [assistant]
+          {/* Links and images become their text: a click or a load would send a request out. */}
+          <ReactMarkdown remarkPlugins={[remarkGfm]} disallowedElements={["a", "img"]} unwrapDisallowed>
+            {entry.text}
+          </ReactMarkdown>
+        </div>
+      ) : null;
     case "query_result":
       return <QueryRunView run={entry.run} />;
     case "invalid_call":
