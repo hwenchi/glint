@@ -15,13 +15,15 @@ from pydantic import ValidationError
 from glint.agent import Session
 from glint.config import load_config
 from glint.postgres.engine import PostgresEngine
-from glint.server import create_app
+from glint.server import STATIC, create_app
 
 MAX_ROWS = 500
 TIMEOUT = timedelta(seconds=30)
 
 
 def main() -> None:
+    if not (STATIC / "index.html").exists():
+        sys.exit("The page isn't built: run make build.")
     path = Path(sys.argv[1] if len(sys.argv) > 1 else "glint.toml")
     try:
         config = load_config(path)
@@ -45,7 +47,7 @@ def main() -> None:
     token = secrets.token_urlsafe(32)
     app = create_app(session, token, port)
 
-    url = f"http://127.0.0.1:{port}/?token={token}"
+    url = f"http://127.0.0.1:{port}/chat/?token={token}"
     print(f"Glint is running at {url}", flush=True)
     webbrowser.open(url)
     uvicorn.Server(uvicorn.Config(app, log_level="warning")).run(sockets=[sock])

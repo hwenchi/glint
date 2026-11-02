@@ -7,13 +7,22 @@ COMPOSE := docker compose -f tests/db/compose.yaml
 export GLINT_TEST_DB_PORT ?= 15432
 export GLINT_TEST_DATABASE_URL := postgresql://postgres:postgres@127.0.0.1:$(GLINT_TEST_DB_PORT)/pagila
 
-.PHONY: test image pagila db db-down db-reset types
+.PHONY: test image pagila db db-down db-reset types build
 .DEFAULT_GOAL := test
 
+# The page, built into the Python package, which serves it.
+build: types
+	cd frontend && npm run build
+
 # The frontend's API types, generated from the server's OpenAPI schema.
-types:
+types: frontend/node_modules
 	uv run python -m glint.openapi > frontend/openapi.json
 	cd frontend && npm run types
+
+# The frontend's packages, exactly as locked; reinstalled when the lockfile changes.
+frontend/node_modules: frontend/package-lock.json
+	cd frontend && npm ci
+	touch $@
 
 # Everything below is for testing.
 

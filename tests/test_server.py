@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from fakes import FakeEndpoint, FakeEngine
 from glint.agent import Session
 from glint.history import AssistantMessage
-from glint.server import TOKEN_COOKIE, create_app
+from glint.server import CSP, TOKEN_COOKIE, create_app
 
 TOKEN = "secret-token"
 PORT = 8765
@@ -76,6 +76,13 @@ def test_post_from_the_page(logged_in, origin):
 def test_post_from_elsewhere(logged_in, origin):
     headers = {"origin": origin} if origin else {}
     assert logged_in.post("/ping", headers=headers).status_code == 403
+
+
+def test_security_headers(logged_in):
+    headers = logged_in.get("/api/history").headers
+    assert headers["content-security-policy"] == CSP
+    assert "script-src 'self'" in headers["content-security-policy"]
+    assert headers["referrer-policy"] == "no-referrer"
 
 
 def test_history_starts_empty(logged_in):

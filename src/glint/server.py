@@ -1,9 +1,11 @@
 """The local web server: only the user's own browser, on this machine, gets in."""
 
 import secrets
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, TypeAdapter
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -11,6 +13,26 @@ from glint.agent import Session
 from glint.history import Entry
 
 TOKEN_COOKIE = "glint_token"
+
+# Only Glint's own files may run or load, and nothing may leave the page.
+CSP = "; ".join([
+    "default-src 'none'",  # anything not allowed below is blocked
+    "script-src 'self'",  # only Glint's own scripts: no inline code, no eval, no CDNs
+    "style-src 'self'",  # only Glint's own stylesheets
+    "img-src 'self'",  # no images from elsewhere, whose URLs could carry data out
+    "connect-src 'self'",  # fetch only Glint's API
+    "base-uri 'none'",  # no <base> tag redirecting the page's relative URLs
+    "form-action 'none'",  # no form can submit anywhere
+    "frame-ancestors 'none'",  # no other site may embed the page in a frame
+])
+
+SECURITY_HEADERS = {
+    "Content-Security-Policy": CSP,
+    # The first page load has the token in its URL; never send that URL anywhere.
+    "Referrer-Policy": "no-referrer",
+}
+
+STATIC = Path(__file__).parent / "static"  # built from frontend/
 
 ENTRY = TypeAdapter(Entry)
 
@@ -28,7 +50,13 @@ def create_app(session: Session, token: str, port: int) -> FastAPI:
     def valid(given: str) -> bool:
         return secrets.compare_digest(given.encode(), token.encode())
 
-    # Middleware added later runs earlier: host, then token, then origin.
+    # Middleware added later runs earlier: host, then token, then origin, then headers.
+
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.update(SECURITY_HEADERS)
+        return response
 
     @app.middleware("http")
     async def require_same_origin(request: Request, call_next):
@@ -66,5 +94,9 @@ def create_app(session: Session, token: str, port: int) -> FastAPI:
         entries = session.respond(message.text)
         events = (b"data: " + ENTRY.dump_json(entry) + b"\n\n" for entry in entries)
         return StreamingResponse(events, media_type="text/event-stream")
+
+    # The page. check_dir=False: the page may not be built yet when the app is
+    # created for tests or for generating the API types. The glint command checks it exists.
+    app.mount("/chat", StaticFiles(directory=STATIC, html=True, check_dir=False))
 
     return app
