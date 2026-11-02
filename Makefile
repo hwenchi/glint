@@ -7,8 +7,18 @@ COMPOSE := docker compose -f tests/db/compose.yaml
 export GLINT_TEST_DB_PORT ?= 15432
 export GLINT_TEST_DATABASE_URL := postgresql://postgres:postgres@127.0.0.1:$(GLINT_TEST_DB_PORT)/pagila
 
-.PHONY: test image pagila db db-down db-reset types build
+.PHONY: test image pagila db db-down db-reset types build dev ollama
 .DEFAULT_GOAL := test
+
+# Glint on the test database with a local model from Ollama; see dev.toml.
+dev: build db ollama
+	uv run glint dev.toml
+
+# Ollama running, started in the background if it isn't. The model in dev.toml
+# must already be pulled: ollama pull qwen3.5:4b
+ollama:
+	ollama list > /dev/null 2>&1 || (ollama serve > /dev/null 2>&1 &)
+	until ollama list > /dev/null 2>&1; do sleep 0.2; done
 
 # The page, built into the Python package, which serves it.
 build: types
