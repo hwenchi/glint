@@ -7,7 +7,7 @@ COMPOSE := docker compose -f tests/db/compose.yaml
 export GLINT_TEST_DB_PORT ?= 15432
 export GLINT_TEST_DATABASE_URL := postgresql://postgres:postgres@127.0.0.1:$(GLINT_TEST_DB_PORT)/pagila
 
-.PHONY: test image pagila db db-down db-reset types build dev ollama
+.PHONY: test image pagila db db-down db-reset types build dev ollama schema
 .DEFAULT_GOAL := test
 
 # Glint on the test database with a local model from Ollama; see dev.toml.
@@ -23,6 +23,11 @@ ollama:
 # The page, built into the Python package, which serves it.
 build: types
 	cd frontend && npm run build
+
+# The Vega-Lite schema the server checks the model's charts against, from the
+# version the page renders with. Committed, since the package needs it at runtime.
+schema: frontend/node_modules
+	cp frontend/node_modules/vega-lite/build/vega-lite-schema.json src/glint/schemas/vega-lite.json
 
 # The frontend's API types, generated from the server's OpenAPI schema.
 types: frontend/node_modules

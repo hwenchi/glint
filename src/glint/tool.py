@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from glint.engine import Engine, QueryError
 from glint.serialize import Result
-from glint.spec import UrlNotAllowed, reject_urls
+from glint.spec import InvalidSpec, UrlNotAllowed, reject_invalid, reject_urls
 
 # Description before sql: models write arguments in schema order, so stating
 # the intent first works as a plan for the SQL.
@@ -88,7 +88,8 @@ def run_query(
         if spec is not None:
             spec = {"description": description, **spec}
             reject_urls(spec)
+            reject_invalid(spec)
         result = Result.from_raw(engine.query(sql))
-    except (QueryError, UrlNotAllowed) as e:
+    except (QueryError, UrlNotAllowed, InvalidSpec) as e:
         return QueryRun(description=description, sql=sql, spec=spec, at=at, result=None, error=str(e))
     return QueryRun(description=description, sql=sql, spec=spec, at=at, result=result, error=None)

@@ -1,6 +1,6 @@
 import pytest
 
-from glint.spec import UrlNotAllowed, reject_urls
+from glint.spec import InvalidSpec, UrlNotAllowed, reject_invalid, reject_urls
 
 
 @pytest.mark.parametrize(
@@ -37,3 +37,28 @@ def test_rejected(spec, path):
     with pytest.raises(UrlNotAllowed) as e:
         reject_urls(spec)
     assert str(e.value).startswith(f"{path}:")
+
+
+def test_valid_vega_lite():
+    # The example in the query tool's description.
+    reject_invalid({
+        "mark": "line",
+        "encoding": {
+            "x": {"field": "month", "type": "temporal"},
+            "y": {"field": "total", "type": "quantitative", "title": "Total payments"},
+        },
+    })
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        # A small model's spec: no mark, and an "axes" block Vega-Lite doesn't have.
+        {"encoding": {"x": {"field": "pay_year", "type": "nominal"}}, "axes": {"y": {"labelTitle": "Payments"}}},
+        {"mark": "bars"},
+        {"mark": "bar", "encoding": {"x": {"field": "a", "type": "categorical"}}},
+    ],
+)
+def test_invalid_vega_lite(spec):
+    with pytest.raises(InvalidSpec):
+        reject_invalid(spec)
