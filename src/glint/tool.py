@@ -24,7 +24,12 @@ QUERY_TOOL = {
             "properties": {
                 "description": {
                     "type": "string",
-                    "description": "What the query does, in plain language for someone who doesn't read SQL.",
+                    "description": (
+                        "A caption for the result, in plain language for someone who doesn't"
+                        " read SQL: what it shows, not an instruction. For example"
+                        " \"Average payments per month, across all years\", not"
+                        " \"Show the seasonal pattern by comparing months\"."
+                    ),
                 },
                 "sql": {"type": "string", "description": "A single SELECT or EXPLAIN SELECT."},
                 "spec": {
@@ -33,7 +38,8 @@ QUERY_TOOL = {
                         "Optional Vega-Lite spec charting the result. Don't include data:"
                         " the query's result becomes the chart's data, replacing any"
                         " top-level data in the spec. Fields must be the result's column"
-                        " names. Omit for lookups and checks. Example:"
+                        " names. Omit for lookups and checks. Marks: line, point, area, rect,"
+                        " boxplot, bar, arc, tick. Example:"
                         ' {"mark": "line", "encoding": {'
                         '"x": {"field": "month", "type": "temporal"},'
                         ' "y": {"field": "total", "type": "quantitative", "title": "Total payments"}}}'
