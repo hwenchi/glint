@@ -34,22 +34,25 @@ class Session:
         """Answer the user's message: ask the model and run its tool calls until it replies without any.
 
         Each new entry is added to the history and yielded, so it can be shown as it arrives.
+        The history is valid for the API at every yield, so stopping early is safe.
         """
-        yield self._add(UserMessage(text))
+        user_message = UserMessage(text)
+        self._history.append(user_message)
+        yield user_message
         for _ in range(MAX_STEPS):
-            messages = [SYSTEM_MESSAGE] + [to_api(entry) for entry in self._history]
+            messages = [SYSTEM_MESSAGE, *(to_api(entry) for entry in self._history)]
             response = self.client.chat.completions.create(model=self.model, messages=messages, tools=[QUERY_TOOL])
-            reply = self._add(from_api(response.choices[0].message))
+            reply = from_api(response.choices[0].message)
+            results = [run_tool_call(self.engine, call) for call in reply.tool_calls]
+            # Added together: the API rejects a tool call that has no result after it.
+            self._history.extend([reply, *results])
             yield reply
+            yield from results
             if not reply.tool_calls:
                 return
-            for call in reply.tool_calls:
-                yield self._add(run_tool_call(self.engine, call))
-        yield self._add(AssistantMessage(f"Stopped after {MAX_STEPS} steps without an answer."))
-
-    def _add[E: Entry](self, entry: E) -> E:
-        self._history.append(entry)
-        return entry
+        stop_message = AssistantMessage(f"Stopped after {MAX_STEPS} steps without an answer.")
+        self._history.append(stop_message)
+        yield stop_message
 
 
 def run_tool_call(engine: Engine, call: ToolCall) -> QueryResult | InvalidCall:

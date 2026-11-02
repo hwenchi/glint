@@ -38,6 +38,17 @@ def test_respond_with_tool_call():
     assert json.loads(tool_message["content"]) == {"columns": ["rating", "n"], "rows": [["G", 178]]}
 
 
+def test_stopping_early_leaves_valid_history():
+    # As when the browser disconnects: the caller stops right after the tool call.
+    endpoint = FakeEndpoint(AssistantMessage(None, (CALL,)), ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine())
+    turn = session.respond("How many G films?")
+    assert next(turn) == UserMessage("How many G films?")
+    assert next(turn) == AssistantMessage(None, (CALL,))
+    turn.close()
+    assert [type(e) for e in session.history] == [UserMessage, AssistantMessage, QueryResult]
+
+
 def test_respond_keeps_earlier_turns():
     endpoint = FakeEndpoint(ANSWER)
     session = Session(endpoint.client(), "fake-model", FakeEngine())
