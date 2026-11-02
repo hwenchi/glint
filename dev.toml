@@ -1,6 +1,9 @@
 # For make dev: the test database and a local model, so nothing leaves this machine.
 # No secrets here, unlike glint.toml.
 
+# Kept so the conversation can be inspected. Delete it to start fresh.
+history = "glint-history-dev.json"
+
 [database]
 connection = "postgresql://postgres:postgres@127.0.0.1:15432/pagila"
 

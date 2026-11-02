@@ -5,7 +5,7 @@ dist/
 .pytest_cache/
 tests/db/initdb/*-pagila-*.sql
 glint.toml
-glint-history.json
+glint-history*.json
 frontend/node_modules/
 # Built from frontend/ by make; the package serves it.
 src/glint/static/
