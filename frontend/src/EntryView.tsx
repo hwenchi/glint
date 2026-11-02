@@ -42,7 +42,10 @@ function QueryRunView({ run }: { run: QueryRun }) {
           <ResultTable result={run.result} />
         </details>
       ) : (
-        <p>[error] {run.error}</p>
+        <details>
+          <summary>Error</summary>
+          <p>{run.error}</p>
+        </details>
       )}
     </section>
   );
