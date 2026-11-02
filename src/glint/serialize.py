@@ -7,10 +7,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from glint.engine import Result
+from glint.engine import RawResult
 
 
-class ResultData(BaseModel):
+class Result(BaseModel):
     """A query result whose values are plain JSON."""
 
     model_config = ConfigDict(frozen=True)
@@ -18,9 +18,9 @@ class ResultData(BaseModel):
     columns: list[str]
     rows: list[list[Any]]
 
-
-def result_data(result: Result) -> ResultData:
-    return ResultData(columns=result.columns, rows=[[_jsonable(v) for v in row] for row in result.rows])
+    @classmethod
+    def from_raw(cls, raw: RawResult) -> "Result":
+        return cls(columns=raw.columns, rows=[[_jsonable(v) for v in row] for row in raw.rows])
 
 
 def _jsonable(value: Any) -> Any:

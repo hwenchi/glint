@@ -3,10 +3,10 @@ import json
 import httpx2
 from openai import OpenAI
 
-from glint.engine import Result
+from glint.engine import RawResult
 from glint.history import AssistantMessage, to_api
 
-RESULT = Result(["rating", "n"], [("G", 178)])
+RAW_RESULT = RawResult(["rating", "n"], [("G", 178)])
 
 
 class FakeEndpoint:
@@ -44,7 +44,7 @@ class FakeEndpoint:
 class FakeEngine:
     """An Engine that returns a fixed result or error, and records the queries it gets."""
 
-    def __init__(self, result=RESULT, error=None):
+    def __init__(self, result=RAW_RESULT, error=None):
         self.result = result
         self.error = error
         self.queries = []

@@ -5,17 +5,17 @@ from uuid import UUID
 
 import pytest
 
-from glint.engine import Result
-from glint.serialize import result_data
+from glint.engine import RawResult
+from glint.serialize import Result
 
 
 def _reject_constant(name):
     raise ValueError(f"not strict JSON: {name}")
 
 
-def parse(result):
+def parse(raw):
     """Parse as strictly as a browser's JSON.parse, which rejects NaN and Infinity."""
-    return json.loads(result_data(result).model_dump_json(), parse_constant=_reject_constant)
+    return json.loads(Result.from_raw(raw).model_dump_json(), parse_constant=_reject_constant)
 
 
 @pytest.mark.parametrize(
@@ -44,8 +44,8 @@ def parse(result):
     ],
 )
 def test_value(value, expected):
-    assert parse(Result(["x"], [(value,)])) == {"columns": ["x"], "rows": [[expected]]}
+    assert parse(RawResult(["x"], [(value,)])) == {"columns": ["x"], "rows": [[expected]]}
 
 
 def test_empty_result_keeps_columns():
-    assert parse(Result(["a", "b"], [])) == {"columns": ["a", "b"], "rows": []}
+    assert parse(RawResult(["a", "b"], [])) == {"columns": ["a", "b"], "rows": []}

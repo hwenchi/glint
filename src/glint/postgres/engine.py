@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import psycopg
 
-from glint.engine import QueryError, Result, Timeout
+from glint.engine import QueryError, RawResult, Timeout
 from glint.postgres.execute import run
 from glint.postgres.validate import validate
 
@@ -19,7 +19,7 @@ class PostgresEngine:
         self.max_rows = max_rows
         self.timeout = timeout
 
-    def query(self, sql: str) -> Result:
+    def query(self, sql: str) -> RawResult:
         stmt = validate(sql)
         try:
             return run(self.conn, stmt, self.max_rows, self.timeout)

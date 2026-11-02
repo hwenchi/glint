@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 from openai.types.chat import ChatCompletionMessage
 
-from fakes import RESULT
+from fakes import RAW_RESULT
 from glint.history import (
     AssistantMessage,
     InvalidCall,
@@ -13,7 +13,7 @@ from glint.history import (
     from_api,
     to_api,
 )
-from glint.serialize import result_data
+from glint.serialize import Result
 from glint.tool import QueryRun
 
 AT = datetime(2026, 11, 1, tzinfo=UTC)
@@ -37,7 +37,7 @@ def test_assistant_message_with_tool_calls():
 
 
 def test_query_result():
-    run = QueryRun(description="d", sql="SELECT 1", spec=None, at=AT, result=result_data(RESULT), error=None)
+    run = QueryRun(description="d", sql="SELECT 1", spec=None, at=AT, result=Result.from_raw(RAW_RESULT), error=None)
     message = to_api(QueryResult("call_1", run))
     assert (message["role"], message["tool_call_id"]) == ("tool", "call_1")
     assert json.loads(message["content"]) == {"columns": ["rating", "n"], "rows": [["G", 178]]}

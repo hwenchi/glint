@@ -3,7 +3,9 @@
 from typing import Any, NamedTuple, Protocol
 
 
-class Result(NamedTuple):
+class RawResult(NamedTuple):
+    """A result as the database driver returns it, with values like Decimal and datetime."""
+
     columns: list[str]
     rows: list[tuple[Any, ...]]
 
@@ -29,6 +31,6 @@ class Timeout(QueryError):
 
 
 class Engine(Protocol):
-    def query(self, sql: str) -> Result:
+    def query(self, sql: str) -> RawResult:
         """Run a read-only query within the engine's limits, or raise QueryError."""
         ...

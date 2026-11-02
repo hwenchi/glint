@@ -10,7 +10,7 @@ from pglast.enums import LimitOption
 from pglast.stream import RawStream
 from psycopg.pq import TransactionStatus
 
-from glint.engine import Result, TooManyRows
+from glint.engine import RawResult, TooManyRows
 
 
 def run(
@@ -18,7 +18,7 @@ def run(
     stmt: ast.SelectStmt | ast.ExplainStmt,
     max_rows: int,
     timeout: timedelta,
-) -> Result:
+) -> RawResult:
     """Run a validated statement, failing rather than truncating past max_rows."""
     match stmt:
         case ast.ExplainStmt():
@@ -31,7 +31,7 @@ def run(
         columns = [d.name for d in cur.description]
     if len(rows) > max_rows:
         raise TooManyRows(max_rows)
-    return Result(columns, rows)
+    return RawResult(columns, rows)
 
 
 @contextmanager

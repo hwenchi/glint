@@ -6,7 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from glint.engine import Engine, QueryError
-from glint.serialize import ResultData, result_data
+from glint.serialize import Result
 from glint.spec import UrlNotAllowed, reject_urls
 
 # Description before sql: models write arguments in schema order, so stating
@@ -72,7 +72,7 @@ class QueryRun(BaseModel):
     sql: str
     spec: dict[str, Any] | None
     at: datetime
-    result: ResultData | None
+    result: Result | None
     error: str | None
 
 
@@ -84,7 +84,7 @@ def run_query(
         if spec is not None:
             spec = {"description": description, **spec}
             reject_urls(spec)
-        result = result_data(engine.query(sql))
+        result = Result.from_raw(engine.query(sql))
     except (QueryError, UrlNotAllowed) as e:
         return QueryRun(description=description, sql=sql, spec=spec, at=at, result=None, error=str(e))
     return QueryRun(description=description, sql=sql, spec=spec, at=at, result=result, error=None)
