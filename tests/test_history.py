@@ -76,17 +76,18 @@ def test_history_in_memory():
 
 
 def test_history_saved_and_reloaded(tmp_path):
-    path = tmp_path / "history.json"
+    path = tmp_path / "history.jsonl"
     run = QueryRun(description="d", sql="SELECT 1", spec=None, at=AT, result=Result.from_raw(RAW_RESULT), error=None)
-    entries = [UserMessage("hi"), AssistantMessage(None, (CALL,)), QueryResult("call_1", run)]
+    entries = [UserMessage("hi\nthere"), AssistantMessage(None, (CALL,)), QueryResult("call_1", run)]
     History(path).extend(*entries)
+    assert len(path.read_text().splitlines()) == len(entries)  # one per line, newlines in text escaped
     assert History(path).entries == entries
     assert path.stat().st_mode & 0o777 == 0o600
     assert list(tmp_path.iterdir()) == [path]  # no temp file left behind
 
 
 def test_history_starts_empty_without_a_file(tmp_path):
-    assert History(tmp_path / "history.json").entries == []
+    assert History(tmp_path / "history.jsonl").entries == []
 
 
 def message(**fields):

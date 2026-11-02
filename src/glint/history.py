@@ -56,7 +56,7 @@ class InvalidCall:
 
 Entry = Annotated[UserMessage | AssistantMessage | QueryResult | InvalidCall, Field(discriminator="kind")]
 
-ENTRIES = TypeAdapter(list[Entry])
+ENTRY = TypeAdapter(Entry)
 
 
 class History:
@@ -78,7 +78,7 @@ class History:
 
 
 def _save(entries: list[Entry], path: Path) -> None:
-    """Write the entries to path, replacing the file whole so a crash never leaves half of one.
+    """Write the entries to path, one per line, replacing the file whole so a crash never leaves half of one.
 
     Only the owner may read it: it holds query results.
     """
@@ -86,7 +86,7 @@ def _save(entries: list[Entry], path: Path) -> None:
     # Created private, so the data is never readable by others, not even briefly.
     with open(temp, "wb", opener=lambda p, flags: os.open(p, flags, 0o600)) as f:
         os.fchmod(f.fileno(), 0o600)  # in case a leftover temp file had wider permissions
-        f.write(ENTRIES.dump_json(entries))
+        f.writelines(ENTRY.dump_json(entry) + b"\n" for entry in entries)
     os.replace(temp, path)
 
 
@@ -96,7 +96,7 @@ def _load(path: Path) -> list[Entry]:
         data = path.read_bytes()
     except FileNotFoundError:
         return []
-    return ENTRIES.validate_json(data)
+    return [ENTRY.validate_json(line) for line in data.splitlines()]
 
 
 def to_api(entry: Entry) -> dict[str, Any]:

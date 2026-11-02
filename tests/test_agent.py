@@ -40,7 +40,7 @@ def test_respond_with_tool_call():
 
 
 def test_respond_continues_saved_history(tmp_path):
-    path = tmp_path / "history.json"
+    path = tmp_path / "history.jsonl"
     first = Session(FakeEndpoint(ANSWER).client(), "fake-model", FakeEngine(), History(path))
     list(first.respond("How many G films?"))
     endpoint = FakeEndpoint(ANSWER)

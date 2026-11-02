@@ -6,11 +6,11 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from glint.agent import Session
-from glint.history import Entry
+from glint.history import ENTRY, Entry
 
 TOKEN_COOKIE = "glint_token"
 
@@ -36,8 +36,6 @@ SECURITY_HEADERS = {
 }
 
 STATIC = Path(__file__).parent / "static"  # built from frontend/
-
-ENTRY = TypeAdapter(Entry)
 
 
 class NewMessage(BaseModel):
