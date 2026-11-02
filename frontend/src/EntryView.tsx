@@ -40,6 +40,12 @@ function QueryRunView({ run }: { run: QueryRun }) {
         <summary>SQL</summary>
         <pre>{run.sql}</pre>
       </details>
+      {run.spec && (
+        <details>
+          <summary>Spec</summary>
+          <pre>{JSON.stringify(run.spec, null, 2)}</pre>
+        </details>
+      )}
       {run.spec && run.result && <Chart spec={run.spec} result={run.result} />}
       {run.result ? (
         <details>
