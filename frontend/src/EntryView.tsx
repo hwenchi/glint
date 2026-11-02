@@ -22,7 +22,12 @@ export function EntryView({ entry }: { entry: Entry }) {
     case "query_result":
       return <QueryRunView run={entry.run} />;
     case "invalid_call":
-      return <p>[invalid call] {entry.error}</p>;
+      return (
+        <details>
+          <summary>Invalid call</summary>
+          <p>{entry.error}</p>
+        </details>
+      );
   }
 }
 
