@@ -1,5 +1,8 @@
 # Copy to glint.toml and fill in. glint.toml holds credentials and is kept out of git.
 
+# To keep the conversation across restarts, save it to a file. It holds query results.
+# history = "glint-history.json"
+
 [database]
 # A libpq connection string: a URL, or key=value pairs if the password has special characters.
 connection = "postgresql://user:password@localhost:5432/dbname"

@@ -8,6 +8,7 @@ from fakes import RAW_RESULT
 from glint.history import (
     AssistantMessage,
     Entry,
+    History,
     InvalidCall,
     QueryResult,
     ToolCall,
@@ -66,6 +67,26 @@ def test_history_json():
     data = json.loads(adapter.dump_json(history))
     assert [e["kind"] for e in data] == ["user", "assistant", "query_result", "invalid_call"]
     assert adapter.validate_python(data) == history
+
+
+def test_history_in_memory():
+    history = History()
+    history.extend(UserMessage("hi"))
+    assert history.entries == [UserMessage("hi")]
+
+
+def test_history_saved_and_reloaded(tmp_path):
+    path = tmp_path / "history.json"
+    run = QueryRun(description="d", sql="SELECT 1", spec=None, at=AT, result=Result.from_raw(RAW_RESULT), error=None)
+    entries = [UserMessage("hi"), AssistantMessage(None, (CALL,)), QueryResult("call_1", run)]
+    History(path).extend(*entries)
+    assert History(path).entries == entries
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert list(tmp_path.iterdir()) == [path]  # no temp file left behind
+
+
+def test_history_starts_empty_without_a_file(tmp_path):
+    assert History(tmp_path / "history.json").entries == []
 
 
 def message(**fields):

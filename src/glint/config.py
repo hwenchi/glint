@@ -29,6 +29,8 @@ class Config(BaseModel):
 
     database: DatabaseConfig
     model: ModelConfig
+    # A file to keep the conversation in across restarts. Without it, history is kept only in memory.
+    history: Path | None = None
 
 
 def load_config(path: Path) -> Config:

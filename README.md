@@ -11,9 +11,9 @@ An agent is useful because it runs unsupervised, but its generated programs can'
 Data exploration fits: its output is a view, not a change, and finding insights is a search over queries that language models narrow well, so anyone can explore a database without programming or data-science skills.
 
 - **Read-only:** one `SELECT` checked against an allowlist, run in a rolled-back read-only transaction.
-- **Bounded:** timeouts, a row limit that fails rather than truncates, one query at a time.
-- **No data leaves:** charts are data, never code; no URLs, no `eval`, a strict CSP.
-- **Local only:** `127.0.0.1`, a token, `Host` and `Origin` checks, history in memory.
+- **Bounded:** timeouts, a row limit that fails rather than truncates, one query at a time, 20 steps per message.
+- **No data leaves:** charts are data, never code; links shown as text; no URLs, no `eval`, a strict CSP; results go only to the model.
+- **Local only:** `127.0.0.1`, a token, `Host` and `Origin` checks, history in memory or a private file.
 
 Findings are hypotheses: each chart shows its SQL and table so you can check it.
 

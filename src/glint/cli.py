@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from glint.agent import Session
 from glint.config import load_config
+from glint.history import History
 from glint.postgres.engine import PostgresEngine
 from glint.server import STATIC, create_app
 
@@ -32,13 +33,17 @@ def main() -> None:
     except ValidationError as e:
         sys.exit(f"Invalid config in {path}:\n{e}")
     try:
+        history = History(config.history)
+    except (OSError, ValidationError) as e:
+        sys.exit(f"Can't read the history in {config.history}:\n{e}")
+    try:
         conn = psycopg.connect(config.database.connection)
     except psycopg.OperationalError as e:
         sys.exit(f"Can't connect to the database: {e}")
 
     engine = PostgresEngine(conn, MAX_ROWS, TIMEOUT)
     client = OpenAI(base_url=config.model.base_url, api_key=config.model.api_key)
-    session = Session(client, config.model.name, engine)
+    session = Session(client, config.model.name, engine, history)
 
     # Bind first so the OS picks a free port, which the app needs for its origin check.
     sock = socket.socket()

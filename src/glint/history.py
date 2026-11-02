@@ -1,10 +1,13 @@
 """The entries of a session's history, and their translation to and from the API."""
 
+import os
+from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 from openai.types.chat import ChatCompletionMessage
-from pydantic import Field
+from pydantic import Field, TypeAdapter
 
 from glint.tool import QueryRun
 
@@ -52,6 +55,48 @@ class InvalidCall:
 
 
 Entry = Annotated[UserMessage | AssistantMessage | QueryResult | InvalidCall, Field(discriminator="kind")]
+
+ENTRIES = TypeAdapter(list[Entry])
+
+
+class History:
+    """A session's entries, saved to a file after every change if given one."""
+
+    def __init__(self, path: Path | None = None):
+        self.path = path
+        self._entries = _load(path) if path else []
+
+    @property
+    def entries(self) -> Sequence[Entry]:
+        return self._entries
+
+    def extend(self, *entries: Entry) -> None:
+        """Add the entries together, so the file never has a tool call without its result."""
+        self._entries.extend(entries)
+        if self.path:
+            _save(self._entries, self.path)
+
+
+def _save(entries: list[Entry], path: Path) -> None:
+    """Write the entries to path, replacing the file whole so a crash never leaves half of one.
+
+    Only the owner may read it: it holds query results.
+    """
+    temp = path.with_name(path.name + ".tmp")
+    # Created private, so the data is never readable by others, not even briefly.
+    with open(temp, "wb", opener=lambda p, flags: os.open(p, flags, 0o600)) as f:
+        os.fchmod(f.fileno(), 0o600)  # in case a leftover temp file had wider permissions
+        f.write(ENTRIES.dump_json(entries))
+    os.replace(temp, path)
+
+
+def _load(path: Path) -> list[Entry]:
+    """The entries saved at path, or none if nothing has been saved yet."""
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError:
+        return []
+    return ENTRIES.validate_json(data)
 
 
 def to_api(entry: Entry) -> dict[str, Any]:

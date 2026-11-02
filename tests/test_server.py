@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from fakes import FakeEndpoint, FakeEngine
 from glint.agent import Session
-from glint.history import AssistantMessage
+from glint.history import AssistantMessage, History
 from glint.server import CSP, TOKEN_COOKIE, create_app
 
 TOKEN = "secret-token"
@@ -16,7 +16,7 @@ ORIGIN = f"http://127.0.0.1:{PORT}"
 @pytest.fixture
 def session():
     endpoint = FakeEndpoint(AssistantMessage("Hello."))
-    return Session(endpoint.client(), "fake-model", FakeEngine())
+    return Session(endpoint.client(), "fake-model", FakeEngine(), History())
 
 
 @pytest.fixture

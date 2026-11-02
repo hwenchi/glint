@@ -12,6 +12,12 @@ def test_example_is_valid():
     config = load_config(EXAMPLE)
     assert config.database.connection.startswith("postgresql://")
     assert config.model.name == "qwen3.6-35b-a3b"
+    assert config.history is None
+
+
+def test_history(tmp_path):
+    path = write(tmp_path, 'history = "chats/glint.json"\n[database]\nconnection = "x"\n[model]\nbase_url = "u"\napi_key = "k"\nname = "n"\n')
+    assert load_config(path).history == Path("chats/glint.json")
 
 
 def write(tmp_path, text):
