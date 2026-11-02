@@ -2,6 +2,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { Chart } from "./Chart";
+import { Code } from "./Code";
 import type { Entry, QueryRun, Result } from "./types";
 
 // Tables in replies scroll sideways inside the column, like result tables.
@@ -18,8 +19,9 @@ export function EntryView({ entry }: { entry: Entry }) {
     case "user":
       return <p className="user">{entry.text}</p>;
     case "assistant":
-      // A reply that only calls the tool has no text; its queries show as their own entries.
-      return entry.text ? (
+      // A reply that only calls the tool has no text, or only whitespace; its
+      // queries show as their own entries.
+      return entry.text?.trim() ? (
         <div className="assistant">
           {/* Links and images become their text: a click or a load would send a request out. */}
           <ReactMarkdown
@@ -44,40 +46,57 @@ export function EntryView({ entry }: { entry: Entry }) {
   }
 }
 
-// A query with a chart is a finding: a card with its SQL and table open beside
-// the chart. Any other query is a step: a compact line with everything collapsed.
+// A query with a chart is a finding: a card showing the chart, with its SQL,
+// table and spec a click away. Any other query is a step: one line that opens
+// to its SQL and result.
 function QueryRunView({ run }: { run: QueryRun }) {
-  const charted = Boolean(run.spec && run.result);
+  return run.spec && run.result ? (
+    <FindingView run={run} spec={run.spec} result={run.result} />
+  ) : (
+    <StepView run={run} />
+  );
+}
+
+function FindingView({ run, spec, result }: { run: QueryRun; spec: Record<string, unknown>; result: Result }) {
   return (
-    <section className={charted ? "finding" : run.error ? "step failed" : "step"}>
+    <section className="finding">
       <header>
         <h3>{run.description}</h3>
-        <time>{new Date(run.at).toLocaleTimeString()}</time>
+        <time>{formatTime(run.at)}</time>
       </header>
-      {run.spec && (
-        <details>
-          <summary>Spec</summary>
-          <pre>{JSON.stringify(run.spec, null, 2)}</pre>
-        </details>
-      )}
-      {run.spec && run.result && <Chart spec={run.spec} result={run.result} />}
-      <details open={charted}>
+      <Chart spec={spec} result={result} />
+      <details>
         <summary>SQL</summary>
-        <pre>{run.sql}</pre>
+        <Code code={run.sql} language="sql" />
       </details>
-      {run.result ? (
-        <details open={charted}>
-          <summary>Table ({run.result.rows.length} rows)</summary>
-          <ResultTable result={run.result} />
-        </details>
-      ) : (
-        <details>
-          <summary>Error</summary>
-          <p>{run.error}</p>
-        </details>
-      )}
+      <details>
+        <summary>Table ({result.rows.length} rows)</summary>
+        <ResultTable result={result} />
+      </details>
+      <details>
+        <summary>Spec</summary>
+        <Code code={JSON.stringify(spec, null, 2)} language="json" />
+      </details>
     </section>
   );
+}
+
+function StepView({ run }: { run: QueryRun }) {
+  return (
+    <details className={run.error ? "step failed" : "step"}>
+      <summary>
+        <span title={run.description}>{run.description}</span>
+        <time>{formatTime(run.at)}</time>
+      </summary>
+      <Code code={run.sql} language="sql" />
+      {run.result ? <ResultTable result={run.result} /> : <p className="error">{run.error}</p>}
+      {run.spec && <Code code={JSON.stringify(run.spec, null, 2)} language="json" />}
+    </details>
+  );
+}
+
+function formatTime(at: string): string {
+  return new Date(at).toLocaleTimeString();
 }
 
 function ResultTable({ result }: { result: Result }) {

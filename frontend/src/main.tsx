@@ -1,6 +1,9 @@
-import { StrictMode, type SubmitEvent, useEffect, useState } from "react";
+import { StrictMode, type SubmitEvent, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
+import "@fontsource-variable/source-sans-3/wght.css";
+import "@fontsource-variable/source-serif-4/opsz.css";
+import "@fontsource-variable/source-serif-4/opsz-italic.css";
 import "./style.css";
 
 import { loadHistory, sendMessage } from "./client";
@@ -11,13 +14,50 @@ function App() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const main = useRef<HTMLElement>(null);
+  // Whether the page follows new entries: only while the reader is at the
+  // bottom, so scrolling up to read isn't interrupted.
+  const following = useRef(true);
 
   useEffect(() => {
     loadHistory().then(setEntries);
   }, []);
 
+  // Only the reader's own scrolling decides whether the page follows. Scroll
+  // events also come from layout changes, like a chart drawing in its card,
+  // and from our own scrolling, and must not switch following off.
+  useEffect(() => {
+    const check = () => {
+      const fromEnd = document.documentElement.scrollHeight - (window.innerHeight + window.scrollY);
+      following.current = fromEnd < window.innerHeight / 2;
+    };
+    // After the input has moved the page. Typing in the message box isn't scrolling.
+    const onInput = (event: Event) => {
+      if (event.target instanceof HTMLInputElement) return;
+      requestAnimationFrame(check);
+    };
+    const inputs = ["wheel", "touchmove", "keydown"] as const;
+    inputs.forEach((type) => window.addEventListener(type, onInput, { passive: true }));
+    return () => inputs.forEach((type) => window.removeEventListener(type, onInput));
+  }, []);
+
+  // Follow growth, not entries, since a chart draws after its card appears. The
+  // scroll is instant: a smooth one is still under way when the page grows again,
+  // and its scroll events would then read as the reader scrolling up.
+  useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      if (!following.current) return;
+      const bottom = document.documentElement.scrollHeight - window.innerHeight;
+      window.scrollTo({ top: bottom });
+    });
+    observer.observe(main.current!);
+    return () => observer.disconnect();
+  }, []);
+
   async function send(event: SubmitEvent) {
     event.preventDefault();
+    following.current = true; // the answer to a new question is what the reader wants to see
+    window.scrollTo({ top: document.documentElement.scrollHeight - window.innerHeight });
     setSending(true);
     setText("");
     try {
@@ -30,11 +70,11 @@ function App() {
   }
 
   return (
-    <main>
+    <main ref={main}>
       {entries.length === 0 && (
         <div className="empty">
           <h1>Glint</h1>
-          <p>Ask a question about your data. Every query run to answer it is shown here, with its SQL and results.</p>
+          <p>Ask anything about your data.</p>
         </div>
       )}
       {entries.map((entry, i) => (
@@ -47,7 +87,8 @@ function App() {
           <span />
         </div>
       )}
-      <form onSubmit={send}>
+      {/* Under the welcome until the first message, then pinned to the bottom. */}
+      <form onSubmit={send} className={entries.length === 0 ? "start" : undefined}>
         <input value={text} onChange={(event) => setText(event.target.value)} disabled={sending} />
         <button disabled={sending || !text}>Send</button>
       </form>

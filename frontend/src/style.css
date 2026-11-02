@@ -10,8 +10,11 @@
   --accent: #2563eb;
   --accent-soft: #e8f0fe;
   --danger: #dc2626;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 15px;
+  --error-text: #a65d57; /* errors are routine while exploring, so read quietly */
+  --sans: "Source Sans 3 Variable", system-ui, sans-serif;
+  --serif: "Source Serif 4 Variable", Georgia, serif;
+  font-family: var(--sans);
+  font-size: 16px;
   line-height: 1.6;
   color: var(--text);
 }
@@ -27,17 +30,29 @@ main {
   padding: 2rem 1.25rem 7rem; /* room for the message box */
 }
 
+/* The assistant's replies, the text to read, in the serif; everything else sans, code mono */
+.assistant {
+  font-family: var(--serif);
+}
+
+.assistant table {
+  font-family: var(--sans);
+}
+
 /* Shown until the first message */
 .empty {
-  margin-top: 25vh;
+  margin-top: 22vh;
   text-align: center;
+  font-size: 1.25rem;
   color: var(--muted);
 }
 
 .empty h1 {
   margin: 0 0 0.5rem;
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: 4rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
   color: var(--text);
 }
 
@@ -82,38 +97,65 @@ main {
   font-weight: 600;
 }
 
-/* Other queries: steps, as a quiet trail */
+/* Other queries: steps, one line each, as a quiet trail */
 .step {
-  margin: 0.25rem 0;
+  margin: 0.15rem 0;
   padding: 0.1rem 0 0.1rem 0.75rem;
   border-left: 2px solid var(--border);
 }
 
-.step h3 {
+.step > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  width: auto;
+  list-style: none; /* flex hides the default marker; drawn below instead */
   font-size: 0.85rem;
   font-weight: 400;
-  color: var(--muted);
+}
+
+.step > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* One line per step: a long description ends in an ellipsis */
+.step > summary span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step > summary span::before {
+  content: "▸ ";
+}
+
+.step[open] > summary span::before {
+  content: "▾ ";
 }
 
 .step.failed {
   border-left-color: var(--danger);
 }
 
-.step.failed h3 {
-  color: var(--danger);
+.step .error {
+  color: var(--error-text);
 }
 
-/* Both: the description and when it ran */
-.finding header,
-.step header {
+.step .error {
+  font-size: 0.85rem;
+}
+
+/* A finding's description and when it ran */
+.finding header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
 }
 
-.finding h3,
-.step h3 {
+.finding h3 {
   margin: 0;
 }
 
@@ -126,25 +168,29 @@ main {
 
 .chart-error {
   font-size: 0.85rem;
-  color: var(--danger);
+  color: var(--error-text);
 }
 
 .finding .vega-embed {
   display: block;
-  margin: 1rem 0 0.5rem;
+  width: 100%; /* specs with width "container" fill this */
+  margin: 0.75rem 0 0.25rem;
   overflow-x: auto;
 }
 
-/* An open table under a chart shows its first rows; the rest scroll */
-.finding .table-scroll {
-  max-height: 20rem;
-  overflow-y: auto;
+/* Inner scroll areas scroll without showing a bar */
+.table-scroll,
+pre,
+.vega-embed {
+  scrollbar-width: none;
 }
 
-.finding th {
-  position: sticky;
-  top: 0;
+.table-scroll::-webkit-scrollbar,
+pre::-webkit-scrollbar,
+.vega-embed::-webkit-scrollbar {
+  display: none;
 }
+
 
 /* SQL, spec, table and errors, one click away */
 details {
@@ -154,6 +200,7 @@ details {
 summary {
   width: fit-content;
   cursor: pointer;
+  user-select: none; /* clicking to open and close shouldn't select the label */
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--muted);
@@ -161,10 +208,6 @@ summary {
 
 summary:hover {
   color: var(--text);
-}
-
-.failed summary {
-  color: var(--danger);
 }
 
 .invalid-call {
@@ -183,6 +226,7 @@ pre {
 
 /* Tables, which can be wider than the column, scroll sideways */
 .table-scroll {
+  width: fit-content; /* as wide as its table, so the scrollbar sits beside it */
   max-width: 100%;
   overflow-x: auto;
   margin-top: 0.5rem;
@@ -201,7 +245,6 @@ td {
   border-bottom: 1px solid var(--border);
   text-align: left;
   vertical-align: top;
-  overflow-wrap: anywhere;
 }
 
 th {
@@ -222,6 +265,14 @@ form {
   margin: 0 auto;
   padding: 1rem 1.25rem 1.5rem;
   background: linear-gradient(to bottom, transparent, var(--page) 1rem);
+}
+
+/* Before the first message: in the flow, right under the welcome */
+form.start {
+  position: static;
+  max-width: 40rem;
+  padding: 1.5rem 0 0;
+  background: none;
 }
 
 input {

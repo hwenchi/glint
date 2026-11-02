@@ -26,7 +26,9 @@ export function Chart({ spec, result }: { spec: Record<string, unknown>; result:
 
   useEffect(() => {
     const values = result.rows.map((row) => Object.fromEntries(result.columns.map((column, i) => [column, row[i]])));
-    const specWithData = { ...spec, data: { values } } as VisualizationSpec;
+    // A single chart or layer without its own width fills the card.
+    const fillsCard = !("width" in spec) && ("mark" in spec || "layer" in spec);
+    const specWithData = { ...(fillsCard && { width: "container" }), ...spec, data: { values } } as VisualizationSpec;
     const chart = embed(container.current!, specWithData, OPTIONS);
     chart.catch((e: Error) => setError(e.message));
     return () => {

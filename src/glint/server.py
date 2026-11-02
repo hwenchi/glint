@@ -22,6 +22,7 @@ CSP = "; ".join([
     # out, since every URL it could load is still blocked by the other directives.
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self'",  # no images from elsewhere, whose URLs could carry data out
+    "font-src 'self'",  # only the fonts bundled with the page
     "connect-src 'self'",  # fetch only Glint's API
     "base-uri 'none'",  # no <base> tag redirecting the page's relative URLs
     "form-action 'none'",  # no form can submit anywhere
