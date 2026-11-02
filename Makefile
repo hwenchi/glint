@@ -7,8 +7,12 @@ COMPOSE := docker compose -f tests/db/compose.yaml
 export GLINT_TEST_DB_PORT ?= 15432
 export GLINT_TEST_DATABASE_URL := postgresql://postgres:postgres@127.0.0.1:$(GLINT_TEST_DB_PORT)/pagila
 
-.PHONY: test image pagila db db-down db-reset types build dev ollama schema
-.DEFAULT_GOAL := test
+.PHONY: test image pagila db db-down db-reset types build run dev ollama schema
+.DEFAULT_GOAL := run
+
+# Glint with the database and model in glint.toml; see glint.example.toml.
+run: build
+	uv run glint glint.toml
 
 # Glint on the test database with a local model from Ollama; see dev.toml.
 dev: build db ollama
