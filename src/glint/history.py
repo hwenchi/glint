@@ -5,7 +5,6 @@ from typing import Any
 
 from openai.types.chat import ChatCompletionMessage
 
-from glint.serialize import result_json
 from glint.tool import QueryRun
 
 
@@ -63,7 +62,7 @@ def to_api(entry: Entry) -> dict[str, Any]:
                 ],
             }
         case QueryResult(tool_call_id, QueryRun(error=None, result=result)):
-            return {"role": "tool", "tool_call_id": tool_call_id, "content": result_json(result)}
+            return {"role": "tool", "tool_call_id": tool_call_id, "content": result.model_dump_json()}
         case QueryResult(tool_call_id, QueryRun(error=error)) | InvalidCall(tool_call_id, error):
             return {"role": "tool", "tool_call_id": tool_call_id, "content": f"error: {error}"}
 

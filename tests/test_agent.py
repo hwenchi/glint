@@ -4,6 +4,7 @@ from fakes import RESULT, FakeEndpoint, FakeEngine
 from glint import agent
 from glint.agent import SYSTEM_MESSAGE, Session, run_tool_call
 from glint.history import AssistantMessage, InvalidCall, QueryResult, ToolCall, UserMessage
+from glint.serialize import result_data
 from glint.tool import QUERY_TOOL
 
 CALL = ToolCall("call_1", "query", '{"description": "Films per rating", "sql": "SELECT 1"}')
@@ -29,7 +30,7 @@ def test_respond_with_tool_call():
     entries = list(session.respond("How many G films?"))
     assert [type(e) for e in entries] == [UserMessage, AssistantMessage, QueryResult, AssistantMessage]
     assert entries[1] == AssistantMessage(None, (CALL,))
-    assert entries[2].run.result == RESULT
+    assert entries[2].run.result == result_data(RESULT)
     assert engine.queries == ["SELECT 1"]
     # The second request carries the call and its result, and nothing the model shouldn't see.
     tool_message = endpoint.requests[1]["messages"][3]
@@ -59,7 +60,7 @@ def test_run_tool_call():
     entry = run_tool_call(FakeEngine(), ToolCall("call_1", "query", '{"description": "Films", "sql": "SELECT 1"}'))
     assert isinstance(entry, QueryResult)
     assert entry.tool_call_id == "call_1"
-    assert (entry.run.description, entry.run.sql, entry.run.result) == ("Films", "SELECT 1", RESULT)
+    assert (entry.run.description, entry.run.sql, entry.run.result) == ("Films", "SELECT 1", result_data(RESULT))
 
 
 def test_run_tool_call_malformed():

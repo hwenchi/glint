@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.162.0",
     "openai>=3.42.1",
     "pglast>=8.7",
     "psycopg[binary]>=3.3.6",

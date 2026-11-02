@@ -2,6 +2,7 @@ import pytest
 
 from fakes import RESULT, FakeEngine
 from glint.engine import QueryError
+from glint.serialize import result_data
 from glint.tool import QUERY_TOOL, InvalidToolCall, QueryArgs, parse_arguments, run_query
 
 
@@ -9,7 +10,7 @@ def test_run_query():
     engine = FakeEngine()
     run = run_query(engine, "Films per rating", "SELECT rating, count(*) AS n FROM film GROUP BY rating")
     assert engine.queries == ["SELECT rating, count(*) AS n FROM film GROUP BY rating"]
-    assert (run.result, run.error, run.spec) == (RESULT, None, None)
+    assert (run.result, run.error, run.spec) == (result_data(RESULT), None, None)
 
 
 def test_run_query_with_spec_gets_description():

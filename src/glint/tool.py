@@ -1,12 +1,12 @@
 """The one tool the model has: run a query, optionally with a chart."""
 
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
-from glint.engine import Engine, QueryError, Result
+from glint.engine import Engine, QueryError
+from glint.serialize import ResultData, result_data
 from glint.spec import UrlNotAllowed, reject_urls
 
 # Description before sql: models write arguments in schema order, so stating
@@ -63,15 +63,16 @@ def parse_arguments(name: str, arguments: str) -> QueryArgs:
         raise InvalidToolCall(str(e)) from None
 
 
-@dataclass(frozen=True)
-class QueryRun:
+class QueryRun(BaseModel):
     """One attempt to run a query: what was asked, when, and its result or error."""
+
+    model_config = ConfigDict(frozen=True)
 
     description: str
     sql: str
     spec: dict[str, Any] | None
     at: datetime
-    result: Result | None
+    result: ResultData | None
     error: str | None
 
 
@@ -83,7 +84,7 @@ def run_query(
         if spec is not None:
             spec = {"description": description, **spec}
             reject_urls(spec)
-        result = engine.query(sql)
+        result = result_data(engine.query(sql))
     except (QueryError, UrlNotAllowed) as e:
-        return QueryRun(description, sql, spec, at, None, str(e))
-    return QueryRun(description, sql, spec, at, result, None)
+        return QueryRun(description=description, sql=sql, spec=spec, at=at, result=None, error=str(e))
+    return QueryRun(description=description, sql=sql, spec=spec, at=at, result=result, error=None)

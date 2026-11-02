@@ -6,7 +6,7 @@ from uuid import UUID
 import pytest
 
 from glint.engine import Result
-from glint.serialize import result_json
+from glint.serialize import result_data
 
 
 def _reject_constant(name):
@@ -15,7 +15,7 @@ def _reject_constant(name):
 
 def parse(result):
     """Parse as strictly as a browser's JSON.parse, which rejects NaN and Infinity."""
-    return json.loads(result_json(result), parse_constant=_reject_constant)
+    return json.loads(result_data(result).model_dump_json(), parse_constant=_reject_constant)
 
 
 @pytest.mark.parametrize(

@@ -1,28 +1,35 @@
-"""JSON for query results, shared by the model, the history and the page."""
+"""Query results as JSON, shared by the model, the history and the page."""
 
-import json
 import math
 from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
+
 from glint.engine import Result
 
 
-def result_json(result: Result) -> str:
-    rows = [[_jsonable(v) for v in row] for row in result.rows]
-    # allow_nan=False: bare NaN and Infinity aren't JSON, and the browser
-    # rejects them, so _jsonable must have turned them into strings.
-    return json.dumps({"columns": result.columns, "rows": rows}, allow_nan=False)
+class ResultData(BaseModel):
+    """A query result whose values are plain JSON."""
+
+    model_config = ConfigDict(frozen=True)
+
+    columns: list[str]
+    rows: list[list[Any]]
+
+
+def result_data(result: Result) -> ResultData:
+    return ResultData(columns=result.columns, rows=[[_jsonable(v) for v in row] for row in result.rows])
 
 
 def _jsonable(value: Any) -> Any:
-    """A query value as something json can encode."""
+    """A query value as plain JSON."""
     match value:
         case None | bool() | int() | str():
             return value
         case float() | Decimal() if math.isnan(value):
-            return "NaN"
+            return "NaN"  # NaN and Infinity aren't JSON, and the browser rejects them
         case float() | Decimal() if math.isinf(value):
             return "Infinity" if value > 0 else "-Infinity"
         case float() | Decimal():

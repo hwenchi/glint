@@ -13,6 +13,7 @@ from glint.history import (
     from_api,
     to_api,
 )
+from glint.serialize import result_data
 from glint.tool import QueryRun
 
 AT = datetime(2026, 11, 1, tzinfo=UTC)
@@ -36,14 +37,14 @@ def test_assistant_message_with_tool_calls():
 
 
 def test_query_result():
-    run = QueryRun("d", "SELECT 1", None, AT, RESULT, None)
+    run = QueryRun(description="d", sql="SELECT 1", spec=None, at=AT, result=result_data(RESULT), error=None)
     message = to_api(QueryResult("call_1", run))
     assert (message["role"], message["tool_call_id"]) == ("tool", "call_1")
     assert json.loads(message["content"]) == {"columns": ["rating", "n"], "rows": [["G", 178]]}
 
 
 def test_query_result_error():
-    run = QueryRun("d", "SELECT nope", None, AT, None, 'column "nope" does not exist')
+    run = QueryRun(description="d", sql="SELECT nope", spec=None, at=AT, result=None, error='column "nope" does not exist')
     assert to_api(QueryResult("call_1", run)) == {
         "role": "tool", "tool_call_id": "call_1", "content": 'error: column "nope" does not exist',
     }
