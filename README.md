@@ -1,6 +1,6 @@
 # Glint
 
-> As you travel across the open ocean, your gaze wanders over its boundless, shifting expanse. Countless facets glimmer and fade, each a fleeting flicker on the water. Every so often, one catches the light just so, and for an instant, you glimpse a tiny piece of the sun.
+> As you travel across the open ocean, your gaze drifts over its restless, heaving expanse. Light breaks across the water in countless facets, each one flaring and gone before you can fix on it. Every so often, one tilts toward you at just the right angle, and for an instant, you glimpse a tiny piece of the sun.
 
 Ask questions about a PostgreSQL database in plain language. A language model writes the queries and charts; you see every query it runs.
 
