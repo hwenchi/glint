@@ -1,0 +1,11 @@
+# Copy to glint.toml and fill in. glint.toml holds credentials and is kept out of git.
+
+[database]
+# A libpq connection string: a URL, or key=value pairs if the password has special characters.
+connection = "postgresql://user:password@localhost:5432/dbname"
+
+[model]
+# Any OpenAI-compatible endpoint.
+base_url = "https://api.example.com/v1"
+api_key = "your-api-key"
+name = "model-name"
