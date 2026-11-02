@@ -5,3 +5,6 @@ dist/
 .pytest_cache/
 tests/db/initdb/*-pagila-*.sql
 glint.toml
+frontend/node_modules/
+# Built from frontend/ by make; the package serves it.
+src/glint/static/

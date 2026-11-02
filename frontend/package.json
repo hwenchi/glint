@@ -1,0 +1,21 @@
+{
+  "name": "glint-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "types": "openapi-typescript openapi.json -o src/api.ts"
+  },
+  "dependencies": {
+    "eventsource-parser": "4.1.2",
+    "vega": "6.4.0",
+    "vega-embed": "7.3.0",
+    "vega-interpreter": "2.3.2",
+    "vega-lite": "6.5.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.4"
+  }
+}
