@@ -36,5 +36,5 @@ export function Chart({ spec, result }: { spec: Record<string, unknown>; result:
     };
   }, [spec, result]);
 
-  return error ? <p>[chart error] {error}</p> : <div ref={container} />;
+  return error ? <p className="chart-error">Couldn't draw the chart: {error}</p> : <div ref={container} />;
 }
