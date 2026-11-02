@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { Chart } from "./Chart";
 import type { Entry, QueryRun, Result } from "./types";
 
 export function EntryView({ entry }: { entry: Entry }) {
@@ -31,6 +32,7 @@ function QueryRunView({ run }: { run: QueryRun }) {
       <p>[query] {run.description}</p>
       <p>{new Date(run.at).toLocaleString()}</p>
       <pre>{run.sql}</pre>
+      {run.spec && run.result && <Chart spec={run.spec} result={run.result} />}
       {run.result ? <ResultTable result={run.result} /> : <p>[error] {run.error}</p>}
     </section>
   );
