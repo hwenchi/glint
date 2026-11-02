@@ -1,10 +1,8 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import type { components } from "./api";
-
-type Schemas = components["schemas"];
-type Entry = Schemas["UserMessage"] | Schemas["AssistantMessage"] | Schemas["QueryResult"] | Schemas["InvalidCall"];
+import { EntryView } from "./EntryView";
+import type { Entry } from "./types";
 
 function App() {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -18,7 +16,7 @@ function App() {
   return (
     <main>
       {entries.map((entry, i) => (
-        <p key={i}>{entry.kind}</p>
+        <EntryView key={i} entry={entry} />
       ))}
     </main>
   );
