@@ -1,16 +1,22 @@
 """The entries of a session's history, and their translation to and from the API."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from openai.types.chat import ChatCompletionMessage
+from pydantic import Field
 
 from glint.tool import QueryRun
+
+
+# Each entry's kind tags it in JSON, so the page can tell entries apart. It
+# comes last, with a default, so constructors and match patterns ignore it.
 
 
 @dataclass(frozen=True)
 class UserMessage:
     text: str
+    kind: Literal["user"] = "user"
 
 
 @dataclass(frozen=True)
@@ -24,6 +30,7 @@ class ToolCall:
 class AssistantMessage:
     text: str | None
     tool_calls: tuple[ToolCall, ...] = ()
+    kind: Literal["assistant"] = "assistant"
 
 
 @dataclass(frozen=True)
@@ -32,6 +39,7 @@ class QueryResult:
 
     tool_call_id: str
     run: QueryRun
+    kind: Literal["query_result"] = "query_result"
 
 
 @dataclass(frozen=True)
@@ -40,9 +48,10 @@ class InvalidCall:
 
     tool_call_id: str
     error: str
+    kind: Literal["invalid_call"] = "invalid_call"
 
 
-Entry = UserMessage | AssistantMessage | QueryResult | InvalidCall
+Entry = Annotated[UserMessage | AssistantMessage | QueryResult | InvalidCall, Field(discriminator="kind")]
 
 
 def to_api(entry: Entry) -> dict[str, Any]:

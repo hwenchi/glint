@@ -2,10 +2,12 @@ import json
 from datetime import UTC, datetime
 
 from openai.types.chat import ChatCompletionMessage
+from pydantic import TypeAdapter
 
 from fakes import RAW_RESULT
 from glint.history import (
     AssistantMessage,
+    Entry,
     InvalidCall,
     QueryResult,
     ToolCall,
@@ -54,6 +56,16 @@ def test_invalid_call():
     assert to_api(InvalidCall("call_1", "unknown tool execute")) == {
         "role": "tool", "tool_call_id": "call_1", "content": "error: unknown tool execute",
     }
+
+
+def test_history_json():
+    # What the page receives: each entry tagged with its kind, and back again.
+    run = QueryRun(description="d", sql="SELECT 1", spec=None, at=AT, result=Result.from_raw(RAW_RESULT), error=None)
+    history = [UserMessage("hi"), AssistantMessage(None, (CALL,)), QueryResult("call_1", run), InvalidCall("call_2", "e")]
+    adapter = TypeAdapter(list[Entry])
+    data = json.loads(adapter.dump_json(history))
+    assert [e["kind"] for e in data] == ["user", "assistant", "query_result", "invalid_call"]
+    assert adapter.validate_python(data) == history
 
 
 def message(**fields):
