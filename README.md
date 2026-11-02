@@ -1,6 +1,6 @@
 # Glint
 
-*Find the insights hiding in your data.*
+> As you travel across the open ocean, your gaze wanders over its boundless, shifting expanse. Countless facets glimmer and fade, each a fleeting flicker on the water. Every so often, one catches the light just so, and for an instant, you glimpse a tiny piece of the sun.
 
 Ask questions about a PostgreSQL database in plain language. A language model writes the queries and charts; you see every query it runs.
 
