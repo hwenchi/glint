@@ -11,7 +11,7 @@ EXAMPLE = Path(__file__).parent.parent / "glint.example.toml"
 def test_example_is_valid():
     config = load_config(EXAMPLE)
     assert config.database.connection.startswith("postgresql://")
-    assert config.model.name == "model-name"
+    assert config.model.name == "qwen3.6-35b-a3b"
 
 
 def write(tmp_path, text):
