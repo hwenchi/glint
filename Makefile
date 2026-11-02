@@ -15,7 +15,7 @@ dev: build db ollama
 	uv run glint dev.toml
 
 # Ollama running, started in the background if it isn't. The model in dev.toml
-# must already be pulled: ollama pull qwen3.5:4b
+# must already be pulled: ollama pull qwen3.6:27b
 ollama:
 	ollama list > /dev/null 2>&1 || (ollama serve > /dev/null 2>&1 &)
 	until ollama list > /dev/null 2>&1; do sleep 0.2; done
