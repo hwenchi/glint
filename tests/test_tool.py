@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from fakes import RESULT, FakeEngine
@@ -12,7 +10,6 @@ def test_run_query():
     run = run_query(engine, "Films per rating", "SELECT rating, count(*) AS n FROM film GROUP BY rating")
     assert engine.queries == ["SELECT rating, count(*) AS n FROM film GROUP BY rating"]
     assert (run.result, run.error, run.spec) == (RESULT, None, None)
-    assert json.loads(run.content()) == {"columns": ["rating", "n"], "rows": [["G", 178]]}
 
 
 def test_run_query_with_spec_gets_description():
@@ -32,13 +29,13 @@ def test_url_fails_the_run_without_querying():
     run = run_query(engine, "Films", "SELECT 1", {"mark": "bar", "encoding": {"href": {"field": "x"}}})
     assert engine.queries == []
     assert run.result is None
-    assert run.content().startswith("error: $.encoding.href:")
+    assert run.error.startswith("$.encoding.href:")
 
 
 def test_query_error():
     run = run_query(FakeEngine(error=QueryError('column "nope" does not exist')), "Films", "SELECT nope")
     assert run.result is None
-    assert run.content() == 'error: column "nope" does not exist'
+    assert run.error == 'column "nope" does not exist'
 
 
 def test_tool_matches_args():

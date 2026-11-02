@@ -1,33 +1,23 @@
-import json
-
-from openai.types.chat import ChatCompletionMessageFunctionToolCall
-
 from fakes import RESULT, FakeEngine
 from glint.agent import run_tool_call
-
-
-def tool_call(arguments, name="query"):
-    return ChatCompletionMessageFunctionToolCall.model_validate(
-        {"id": "call_1", "type": "function", "function": {"name": name, "arguments": arguments}}
-    )
+from glint.history import InvalidCall, QueryResult, ToolCall
 
 
 def test_run_tool_call():
-    message = run_tool_call(FakeEngine(), tool_call('{"description": "Films", "sql": "SELECT 1"}'))
-    assert message["role"] == "tool"
-    assert message["tool_call_id"] == "call_1"
-    assert json.loads(message["content"]) == {"columns": ["rating", "n"], "rows": [["G", 178]]}
-    assert (message["query_run"].sql, message["query_run"].result) == ("SELECT 1", RESULT)
+    entry = run_tool_call(FakeEngine(), ToolCall("call_1", "query", '{"description": "Films", "sql": "SELECT 1"}'))
+    assert isinstance(entry, QueryResult)
+    assert entry.tool_call_id == "call_1"
+    assert (entry.run.description, entry.run.sql, entry.run.result) == ("Films", "SELECT 1", RESULT)
 
 
 def test_run_tool_call_malformed():
     engine = FakeEngine()
-    message = run_tool_call(engine, tool_call('{"description": "Films"}'))
+    entry = run_tool_call(engine, ToolCall("call_1", "query", '{"description": "Films"}'))
     assert engine.queries == []
-    assert message["content"].startswith("error: ")
-    assert "query_run" not in message
+    assert isinstance(entry, InvalidCall)
+    assert entry.tool_call_id == "call_1"
 
 
 def test_run_tool_call_unknown_tool():
-    message = run_tool_call(FakeEngine(), tool_call("{}", name="execute"))
-    assert message["content"] == "error: unknown tool execute"
+    entry = run_tool_call(FakeEngine(), ToolCall("call_1", "execute", "{}"))
+    assert entry == InvalidCall("call_1", "unknown tool execute")

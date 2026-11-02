@@ -7,7 +7,6 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from glint.engine import Engine, QueryError, Result
-from glint.serialize import result_json
 from glint.spec import UrlNotAllowed, reject_urls
 
 # Description before sql: models write arguments in schema order, so stating
@@ -74,10 +73,6 @@ class QueryRun:
     at: datetime
     result: Result | None
     error: str | None
-
-    def content(self) -> str:
-        """What the model sees: the tool message's content."""
-        return f"error: {self.error}" if self.error is not None else result_json(self.result)
 
 
 def run_query(
