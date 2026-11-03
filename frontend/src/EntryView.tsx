@@ -1,3 +1,4 @@
+import { memo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -14,7 +15,8 @@ const MARKDOWN_COMPONENTS: Components = {
   ),
 };
 
-export function EntryView({ entry }: { entry: Entry }) {
+// An entry never changes once it arrives, so it renders once, not on every keystroke.
+export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
   switch (entry.kind) {
     case "user":
       return <p className="user">{entry.text}</p>;
@@ -44,7 +46,7 @@ export function EntryView({ entry }: { entry: Entry }) {
         </details>
       );
   }
-}
+});
 
 // A query with a chart is a finding: a card showing the chart, with its SQL,
 // table and spec a click away. Any other query is a step: one line that opens
