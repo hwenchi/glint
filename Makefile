@@ -14,12 +14,12 @@ export GLINT_TEST_DATABASE_URL := postgresql://postgres:postgres@127.0.0.1:$(GLI
 run: build
 	uv run glint glint.toml
 
-# Glint on the test database with a local model from Ollama; see dev.toml.
+# Glint on the test database with a local model from Ollama; see glint.dev.toml.
 dev: build db ollama
-	uv run glint dev.toml
+	uv run glint glint.dev.toml
 
-# Ollama running, started in the background if it isn't. The model in dev.toml
-# must already be pulled: ollama pull qwen3.6:27b
+# Ollama running, started in the background if it isn't. The model in glint.dev.toml
+# must already be pulled: ollama pull qwen3.6:35b-a3b-coding
 ollama:
 	ollama list > /dev/null 2>&1 || (ollama serve > /dev/null 2>&1 &)
 	until ollama list > /dev/null 2>&1; do sleep 0.2; done
