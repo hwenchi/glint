@@ -18,7 +18,12 @@ def test_example_is_valid():
     assert config.database.connection.startswith("postgresql://")
     assert config.model.name == "qwen3.6-35b-a3b"
     assert config.history is None
-    assert config.effects.allow == [Effect.READS_DATA, Effect.READS_CATALOG, Effect.READS_SESSION, Effect.READS_CLOCK]
+    assert config.effects.allow == [
+        Effect.READS_DATA,
+        Effect.READS_CATALOG,
+        Effect.READS_SESSION_SETTINGS,
+        Effect.READS_CLOCK,
+    ]
 
 
 def test_history(tmp_path):

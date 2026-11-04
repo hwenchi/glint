@@ -13,4 +13,4 @@ api_key = "ollama"  # ignored by Ollama, but the client needs a value
 name = "qwen3.6:27b"
 
 [effects]
-allow = ["reads_data", "reads_catalog", "reads_session", "reads_clock"]
+allow = ["reads_data", "reads_catalog", "reads_session_settings", "reads_clock"]

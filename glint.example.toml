@@ -18,10 +18,12 @@ name = "qwen3.6-35b-a3b"
 allow = [
     "reads_data",
     # "writes_data",
-    "reads_catalog",
+    "reads_catalog",  # every query looks up names, types and operators in the catalog
     # "writes_catalog",
-    "reads_session",  # TimeZone and locale, used by date_trunc, extract and to_char
-    # "writes_session",
+    "reads_session_settings",  # every query reads settings such as search_path and TimeZone
+    # "writes_session_settings",
+    # "reads_session_state",
+    # "writes_session_state",
     # "reads_server",
     # "writes_server",
     # "reads_processes",
@@ -32,7 +34,7 @@ allow = [
     # "writes_files",
     # "reads_network",
     # "writes_network",
-    "reads_clock",  # now() and current_date
+    "reads_clock",  # every query may read the time, e.g. through 'today' or now()
     # "opaque",  # code outside pg_catalog
     # "unclassified",  # anything not yet classified
 ]

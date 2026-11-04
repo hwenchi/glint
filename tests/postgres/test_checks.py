@@ -15,6 +15,7 @@ from glint.postgres.checks import (
 from glint.postgres.effects import Effect
 
 DEEP = "SELECT " + "NOT " * 2000 + "true"  # deeper than Python's default recursion limit
+EVERY_QUERY = [Effect.READS_CATALOG, Effect.READS_SESSION_SETTINGS, Effect.READS_CLOCK]
 
 
 def test_parse():
@@ -71,9 +72,9 @@ def test_check_statement_rejects(sql, error):
 @pytest.mark.parametrize(
     "sql, allow",
     [
-        ("SELECT 1", []),
-        ("SELECT now() FROM film", [Effect.READS_DATA, Effect.READS_CLOCK]),
-        (DEEP, []),
+        ("SELECT 1", EVERY_QUERY),
+        ("SELECT now() FROM film", [*EVERY_QUERY, Effect.READS_DATA]),
+        (DEEP, EVERY_QUERY),
     ],
 )
 def test_check_effects_accepts(sql, allow):
@@ -83,9 +84,15 @@ def test_check_effects_accepts(sql, allow):
 @pytest.mark.parametrize(
     "sql, allow, not_allowed",
     [
-        ("SELECT 1 FROM film", [], {Effect.READS_DATA}),
-        ("SELECT now() FROM film", [Effect.READS_DATA], {Effect.READS_CLOCK}),
-        ("SELECT nextval('s') FROM film", [Effect.READS_DATA], {Effect.WRITES_DATA, Effect.WRITES_SESSION}),
+        ("SELECT 1", [Effect.READS_SESSION_SETTINGS, Effect.READS_CLOCK], {Effect.READS_CATALOG}),
+        ("SELECT 1", [Effect.READS_CATALOG, Effect.READS_CLOCK], {Effect.READS_SESSION_SETTINGS}),
+        ("SELECT 1", [Effect.READS_CATALOG, Effect.READS_SESSION_SETTINGS], {Effect.READS_CLOCK}),
+        ("SELECT 1 FROM film", EVERY_QUERY, {Effect.READS_DATA}),
+        (
+            "SELECT nextval('s') FROM film",
+            [*EVERY_QUERY, Effect.READS_DATA],
+            {Effect.WRITES_DATA, Effect.WRITES_SESSION_STATE},
+        ),
     ],
 )
 def test_check_effects_rejects(sql, allow, not_allowed):
@@ -105,5 +112,5 @@ def test_check_effects_rejects(sql, allow, not_allowed):
 )
 def test_check_effects_message(sql, cause):
     with pytest.raises(EffectsNotAllowed) as e:
-        check_effects(parse(sql), [])
+        check_effects(parse(sql), EVERY_QUERY)
     assert str(e.value) == f"the query may have effects that are not allowed:\n{cause}"

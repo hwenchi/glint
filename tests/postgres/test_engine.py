@@ -9,7 +9,7 @@ from glint.postgres.checks import Rejected
 from glint.postgres.effects import Effect
 from glint.postgres.engine import PostgresEngine
 
-ALLOW = [Effect.READS_DATA, Effect.READS_CATALOG, Effect.READS_SESSION, Effect.READS_CLOCK]
+ALLOW = [Effect.READS_DATA, Effect.READS_CATALOG, Effect.READS_SESSION_SETTINGS, Effect.READS_CLOCK]
 
 
 @pytest.fixture
