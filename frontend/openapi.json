@@ -83,6 +83,18 @@
           }
         }
       }
+    },
+    "/api/interrupt": {
+      "post": {
+        "summary": "Interrupt",
+        "description": "End the running turn before its next step; its stream ends with the entry saying so.",
+        "operationId": "interrupt_api_interrupt_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
     }
   },
   "components": {

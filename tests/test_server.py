@@ -100,3 +100,11 @@ def test_message_streams_the_turn(logged_in):
         {"kind": "assistant", "text": "Hello.", "tool_calls": []},
     ]
     assert logged_in.get("/api/history").json() == entries
+
+
+def test_interrupt(logged_in, session, monkeypatch):
+    calls = []
+    monkeypatch.setattr(session, "interrupt", lambda: calls.append("interrupt"))
+    response = logged_in.post("/api/interrupt", headers={"origin": ORIGIN})
+    assert response.status_code == 204
+    assert calls == ["interrupt"]

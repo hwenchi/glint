@@ -96,6 +96,11 @@ def create_app(session: Session, token: str, port: int) -> FastAPI:
         events = (b"data: " + ENTRY.dump_json(entry) + b"\n\n" for entry in entries)
         return StreamingResponse(events, media_type="text/event-stream")
 
+    @app.post("/api/interrupt", status_code=204)
+    def interrupt():
+        """End the running turn before its next step; its stream ends with the entry saying so."""
+        session.interrupt()
+
     # The page. check_dir=False: the page may not be built yet when the app is
     # created for tests or for generating the API types. The glint command checks it exists.
     app.mount("/chat", StaticFiles(directory=STATIC, html=True, check_dir=False))

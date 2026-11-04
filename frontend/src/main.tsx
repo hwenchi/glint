@@ -6,14 +6,15 @@ import "@fontsource-variable/source-serif-4/opsz.css";
 import "@fontsource-variable/source-serif-4/opsz-italic.css";
 import "./style.css";
 
-import { loadHistory, sendMessage } from "./client";
+import { interrupt, loadHistory, sendMessage } from "./client";
 import { EntryView } from "./EntryView";
 import type { Entry } from "./types";
 
 function App() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const main = useRef<HTMLElement>(null);
   // Whether the page follows new entries: only while the reader is at the
   // bottom, so scrolling up to read isn't interrupted.
@@ -58,15 +59,22 @@ function App() {
     event.preventDefault();
     following.current = true; // the answer to a new question is what the reader wants to see
     window.scrollTo({ top: document.documentElement.scrollHeight - window.innerHeight });
-    setSending(true);
+    setRunning(true);
     setText("");
     try {
       for await (const entry of sendMessage(text)) {
         setEntries((previous) => [...previous, entry]);
       }
     } finally {
-      setSending(false);
+      setRunning(false);
+      setStopping(false);
     }
+  }
+
+  // The turn's stream keeps going until the server ends it with the entry saying so.
+  function stop() {
+    setStopping(true);
+    interrupt();
   }
 
   return (
@@ -80,7 +88,7 @@ function App() {
       {entries.map((entry, i) => (
         <EntryView key={i} entry={entry} />
       ))}
-      {sending && (
+      {running && (
         <div className="working" aria-label="Working">
           <span />
           <span />
@@ -89,8 +97,14 @@ function App() {
       )}
       {/* Under the welcome until the first message, then pinned to the bottom. */}
       <form onSubmit={send} className={entries.length === 0 ? "start" : undefined}>
-        <input value={text} onChange={(event) => setText(event.target.value)} disabled={sending} />
-        <button disabled={sending || !text}>Send</button>
+        <input value={text} onChange={(event) => setText(event.target.value)} disabled={running} />
+        {running ? (
+          <button type="button" onClick={stop} disabled={stopping}>
+            Stop
+          </button>
+        ) : (
+          <button disabled={!text}>Send</button>
+        )}
       </form>
     </main>
   );

@@ -3,7 +3,7 @@ import threading
 
 from fakes import RAW_RESULT, FakeEndpoint, FakeEngine
 from glint import agent
-from glint.agent import SYSTEM_MESSAGE, Session, run_tool_call
+from glint.agent import SYSTEM_MESSAGE, Session, run_tool_call, skip_tool_call
 from glint.history import AssistantMessage, History, InvalidCall, QueryResult, ToolCall, UserMessage
 from glint.serialize import Result
 from glint.tool import QUERY_TOOL
@@ -103,6 +103,48 @@ def test_respond_stops_after_max_steps(monkeypatch):
     entries = list(session.respond("loop"))
     assert len(endpoint.requests) == 3
     assert entries[-1] == AssistantMessage("Stopped after 3 steps without an answer.")
+
+
+def test_interrupt_before_the_next_request():
+    endpoint = FakeEndpoint(ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), History())
+    turn = session.respond("How many G films?")
+    next(turn)
+    session.interrupt()
+    assert list(turn) == [AssistantMessage("Interrupted.")]
+    assert endpoint.requests == []
+
+
+def test_interrupt_cancels_the_remaining_tool_calls():
+    second = ToolCall("call_2", "query", '{"description": "Films per year", "sql": "SELECT 2"}')
+    endpoint = FakeEndpoint(AssistantMessage(None, (CALL, second)), ANSWER)
+    engine = FakeEngine()
+    session = Session(endpoint.client(), "fake-model", engine, History())
+    # The stop arrives while the first query runs.
+    run_first_query = engine.query
+
+    def query(sql):
+        session.interrupt()
+        return run_first_query(sql)
+
+    engine.query = query
+    entries = list(session.respond("How many G films?"))
+    assert engine.queries == ["SELECT 1"]
+    assert len(endpoint.requests) == 1
+    assert [type(e) for e in entries] == [UserMessage, AssistantMessage, QueryResult, QueryResult, AssistantMessage]
+    assert entries[3].run.error == "Canceled."
+    assert entries[4] == AssistantMessage("Interrupted.")
+
+
+def test_interrupt_between_turns_is_ignored():
+    session = Session(FakeEndpoint(ANSWER).client(), "fake-model", FakeEngine(), History())
+    session.interrupt()
+    assert list(session.respond("How many G films?"))[-1] == ANSWER
+
+
+def test_skip_tool_call_malformed():
+    entry = skip_tool_call(ToolCall("call_1", "query", '{"description": "Films"}'))
+    assert isinstance(entry, InvalidCall)
 
 
 def test_run_tool_call():
