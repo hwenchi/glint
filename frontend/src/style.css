@@ -143,10 +143,6 @@ main {
   color: var(--error-text);
 }
 
-.step .error {
-  font-size: 0.85rem;
-}
-
 /* A finding's description and when it ran */
 .finding header {
   display: flex;

@@ -91,7 +91,7 @@ function StepView({ run }: { run: QueryRun }) {
         <time>{formatTime(run.at)}</time>
       </summary>
       <Code code={run.sql} language="sql" />
-      {run.result ? <ResultTable result={run.result} /> : <p className="error">{run.error}</p>}
+      {run.result ? <ResultTable result={run.result} /> : <pre className="error">{run.error}</pre>}
       {run.spec && <Code code={JSON.stringify(run.spec, null, 2)} language="json" />}
     </details>
   );
