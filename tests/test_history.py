@@ -49,13 +49,13 @@ def test_query_result():
 def test_query_result_error():
     run = QueryRun(description="d", sql="SELECT nope", spec=None, at=AT, result=None, error='column "nope" does not exist')
     assert to_api(QueryResult("call_1", run)) == {
-        "role": "tool", "tool_call_id": "call_1", "content": 'error: column "nope" does not exist',
+        "role": "tool", "tool_call_id": "call_1", "content": 'Error: column "nope" does not exist',
     }
 
 
 def test_invalid_call():
-    assert to_api(InvalidCall("call_1", "unknown tool execute")) == {
-        "role": "tool", "tool_call_id": "call_1", "content": "error: unknown tool execute",
+    assert to_api(InvalidCall("call_1", "Unknown tool: execute.")) == {
+        "role": "tool", "tool_call_id": "call_1", "content": "Error: Unknown tool: execute.",
     }
 
 

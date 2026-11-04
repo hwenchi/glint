@@ -118,7 +118,7 @@ def to_api(entry: Entry) -> dict[str, Any]:
         case QueryResult(tool_call_id, QueryRun(error=None, result=result)):
             return {"role": "tool", "tool_call_id": tool_call_id, "content": result.model_dump_json()}
         case QueryResult(tool_call_id, QueryRun(error=error)) | InvalidCall(tool_call_id, error):
-            return {"role": "tool", "tool_call_id": tool_call_id, "content": f"error: {error}"}
+            return {"role": "tool", "tool_call_id": tool_call_id, "content": f"Error: {error}"}
 
 
 def from_api(message: ChatCompletionMessage) -> AssistantMessage:

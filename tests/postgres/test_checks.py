@@ -6,6 +6,7 @@ from glint.postgres.checks import (
     InvalidSyntax,
     ModifyingCTE,
     NotSelect,
+    Rejected,
     SelectInto,
     StatementCount,
     check_effects,
@@ -70,6 +71,24 @@ def test_check_statement_rejects(sql, error):
 
 
 @pytest.mark.parametrize(
+    "sql, message",
+    [
+        ("DELETE FROM t", "Only SELECT is allowed. Found:\nDELETE FROM t"),
+        ("EXPLAIN DELETE FROM t", "Only EXPLAIN SELECT is allowed. Found:\nEXPLAIN DELETE FROM t"),
+        ("SELECT a INTO u FROM t", "SELECT INTO is not allowed. Found:\nSELECT a INTO u FROM t"),
+        (
+            "WITH x AS (DELETE FROM t RETURNING a) SELECT a FROM x",
+            "Only SELECT is allowed in a CTE. Found:\nx AS (DELETE FROM t RETURNING a)",
+        ),
+    ],
+)
+def test_check_statement_message(sql, message):
+    with pytest.raises(Rejected) as e:
+        check_statement(parse(sql))
+    assert str(e.value) == message
+
+
+@pytest.mark.parametrize(
     "sql, allow",
     [
         ("SELECT 1", EVERY_QUERY),
@@ -104,13 +123,13 @@ def test_check_effects_rejects(sql, allow, not_allowed):
 @pytest.mark.parametrize(
     "sql, cause",
     [
-        ("SELECT public.f(1)", "opaque: public.f(1)"),
-        ("SELECT 1 FROM film", "reads_data: film"),
-        ("SELECT 1 OPERATOR(public.+) 2", "opaque: 1 OPERATOR(public.+) 2"),
-        ("SELECT 1::public.t", "opaque: public.t"),
+        ("SELECT public.f(1)", "[opaque] public.f(1)"),
+        ("SELECT 1 FROM film", "[reads_data] film"),
+        ("SELECT 1 OPERATOR(public.+) 2", "[opaque] 1 OPERATOR(public.+) 2"),
+        ("SELECT 1::public.t", "[opaque] public.t"),
     ],
 )
 def test_check_effects_message(sql, cause):
     with pytest.raises(EffectsNotAllowed) as e:
         check_effects(parse(sql), EVERY_QUERY)
-    assert str(e.value) == f"the query may have effects that are not allowed:\n{cause}"
+    assert str(e.value) == f"The query may have effects that are not allowed. Found:\n{cause}"

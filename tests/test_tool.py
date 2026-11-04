@@ -61,7 +61,7 @@ def test_parse_arguments(arguments, expected):
 def test_parse_arguments_unknown_tool():
     with pytest.raises(InvalidToolCall) as e:
         parse_arguments("execute", '{"description": "d", "sql": "s"}')
-    assert str(e.value) == "unknown tool execute"
+    assert str(e.value) == "Unknown tool: execute."
 
 
 @pytest.mark.parametrize(

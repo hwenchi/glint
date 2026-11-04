@@ -122,4 +122,4 @@ def test_run_tool_call_malformed():
 
 def test_run_tool_call_unknown_tool():
     entry = run_tool_call(FakeEngine(), ToolCall("call_1", "execute", "{}"))
-    assert entry == InvalidCall("call_1", "unknown tool execute")
+    assert entry == InvalidCall("call_1", "Unknown tool: execute.")

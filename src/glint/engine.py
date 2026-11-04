@@ -17,7 +17,7 @@ class QueryError(Exception):
 class TooManyRows(QueryError):
     def __init__(self, max_rows: int):
         super().__init__(
-            f"the query returned more than {max_rows} rows: aggregate or filter it"
+            f"The query returned more than {max_rows} rows. Aggregate or filter it."
         )
         self.max_rows = max_rows
 
@@ -25,8 +25,8 @@ class TooManyRows(QueryError):
 class Timeout(QueryError):
     def __init__(self):
         super().__init__(
-            "the query took too long and was cancelled: "
-            "check its cost with EXPLAIN, then filter or aggregate earlier"
+            "The query took too long and was cancelled. "
+            "Check its cost with EXPLAIN, then filter or aggregate earlier."
         )
 
 

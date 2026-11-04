@@ -45,9 +45,9 @@ def parse(sql: str) -> ast.Node:
     try:
         stmts = parse_sql(sql)
     except ParseError as e:
-        raise InvalidSyntax(f"syntax error: {e}") from None
+        raise InvalidSyntax(f"Syntax error: {e}") from None
     if len(stmts) != 1:
-        raise StatementCount(f"expected exactly one statement, got {len(stmts)}")
+        raise StatementCount(f"Expected exactly one statement, got {len(stmts)}.")
     return stmts[0].stmt
 
 
@@ -56,24 +56,24 @@ def check_statement(stmt: ast.Node) -> ast.SelectStmt | ast.ExplainStmt:
     match stmt:
         case ast.SelectStmt() | ast.ExplainStmt(query=ast.SelectStmt()):
             pass
-        case ast.ExplainStmt(query=query):
-            raise NotSelect(f"only EXPLAIN SELECT is allowed, got EXPLAIN {type(query).__name__}")
+        case ast.ExplainStmt():
+            raise NotSelect(f"Only EXPLAIN SELECT is allowed. Found:\n{RawStream()(stmt)}")
         case _:
-            raise NotSelect(f"only SELECT is allowed, got {type(stmt).__name__}")
+            raise NotSelect(f"Only SELECT is allowed. Found:\n{RawStream()(stmt)}")
     # Postgres allows these only at the top level, but the parser accepts some nested forms.
     for node in walk(stmt):
         match node:
             case ast.SelectStmt(intoClause=into) if into is not None:
-                raise SelectInto("SELECT INTO is not allowed")
+                raise SelectInto(f"SELECT INTO is not allowed. Found:\n{RawStream()(node)}")
             case ast.CommonTableExpr(ctequery=query) if not isinstance(query, ast.SelectStmt):
-                raise ModifyingCTE(f"CTE {node.ctename} must be a SELECT")
+                raise ModifyingCTE(f"Only SELECT is allowed in a CTE. Found:\n{RawStream()(node)}")
     return stmt
 
 
 class EffectsNotAllowed(Rejected):
     def __init__(self, causes: list[Cause]):
-        lines = "".join(f"\n{cause.effect}: {RawStream()(cause.node)}" for cause in causes)
-        super().__init__(f"the query may have effects that are not allowed:{lines}")
+        lines = "".join(f"\n[{cause.effect}] {RawStream()(cause.node)}" for cause in causes)
+        super().__init__(f"The query may have effects that are not allowed. Found:{lines}")
         self.causes = causes
 
 
