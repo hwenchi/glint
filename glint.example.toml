@@ -17,7 +17,22 @@ name = "qwen3.6-35b-a3b"
 # The effects a query may have. A query with any other effect is rejected.
 allow = [
     "reads_data",
+    # "writes_data",
     "reads_catalog",
+    # "writes_catalog",
     "reads_session",  # TimeZone and locale, used by date_trunc, extract and to_char
+    # "writes_session",
+    # "reads_server",
+    # "writes_server",
+    # "reads_processes",
+    # "writes_processes",
+    # "reads_locks",
+    # "writes_locks",
+    # "reads_files",
+    # "writes_files",
+    # "reads_network",
+    # "writes_network",
     "reads_clock",  # now() and current_date
+    # "opaque",  # code outside pg_catalog
+    # "unclassified",  # anything not yet classified
 ]
