@@ -227,6 +227,29 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     "crc32c": NONE,
     "num_nulls": NONE,
     "num_nonnulls": NONE,
+    # Casts called by their type's name, as in int4(x). They read settings such as lc_monetary.
+    "bool": NONE,
+    "int2": NONE,
+    "int4": NONE,
+    "int8": NONE,
+    "float4": NONE,
+    "float8": NONE,
+    "numeric": NONE,
+    "money": NONE,
+    "oid": NONE,
+    "xid": NONE,
+    "char": NONE,
+    "bpchar": NONE,
+    "varchar": NONE,
+    "name": NONE,
+    "bytea": NONE,
+    "bit": NONE,
+    "varbit": NONE,
+    "cidr": NONE,
+    "macaddr": NONE,
+    "macaddr8": NONE,
+    "xml": NONE,
+    "regclass": NONE,  # looks the name up in the catalog
     # These date and time functions compute from their arguments alone.
     "make_date": NONE,
     "make_time": NONE,
@@ -422,6 +445,7 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     "pg_column_toast_chunk_id": NONE,
     "pg_size_pretty": NONE,
     "pg_size_bytes": NONE,
+    "cash_words": NONE,
     # These read extension control files and time zone files installed with the server.
     "pg_available_extensions": NONE,
     "pg_available_extension_versions": NONE,
@@ -487,6 +511,12 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     "setval": frozenset({Effect.WRITES_DATA}),
     "pg_sequence_last_value": frozenset({Effect.READS_DATA}),
     "pg_get_sequence_data": frozenset({Effect.READS_DATA}),
+    # These read or write tables and indexes named by their arguments.
+    "currtid2": frozenset({Effect.READS_DATA}),  # the latest version of a row
+    "brin_summarize_range": frozenset({Effect.READS_DATA, Effect.WRITES_DATA}),
+    "brin_summarize_new_values": frozenset({Effect.READS_DATA, Effect.WRITES_DATA}),
+    "brin_desummarize_range": frozenset({Effect.WRITES_DATA}),
+    "gin_clean_pending_list": frozenset({Effect.READS_DATA, Effect.WRITES_DATA}),
     "currval": frozenset({Effect.READS_SESSION_STATE}),
     "lastval": frozenset({Effect.READS_SESSION_STATE}),
     # The session's settings and state.
@@ -518,6 +548,10 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
         Effect.WRITES_SERVER,  # flush=true flushes the write-ahead log
     }),
     "pg_replication_origin_oid": NONE,  # looks the name up in the catalog
+    "pg_replication_origin_session_setup": frozenset({Effect.WRITES_SESSION_STATE}),
+    "pg_replication_origin_session_reset": frozenset({Effect.WRITES_SESSION_STATE}),
+    "pg_replication_origin_xact_setup": frozenset({Effect.WRITES_SESSION_STATE}),
+    "pg_replication_origin_xact_reset": frozenset({Effect.WRITES_SESSION_STATE}),
     "pg_event_trigger_ddl_commands": frozenset({Effect.READS_SESSION_STATE}),  # in an event trigger only
     "pg_event_trigger_dropped_objects": frozenset({Effect.READS_SESSION_STATE}),
     "pg_event_trigger_table_rewrite_oid": frozenset({Effect.READS_SESSION_STATE}),
@@ -653,6 +687,13 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     "convert_from": NONE,
     "convert_to": NONE,
     "pg_import_system_collations": frozenset({Effect.WRITES_CATALOG}),  # adds rows to pg_collation
+    "pg_restore_relation_stats": frozenset({Effect.WRITES_CATALOG}),  # planner statistics in pg_class
+    "pg_clear_relation_stats": frozenset({Effect.WRITES_CATALOG}),
+    "pg_restore_attribute_stats": frozenset({Effect.WRITES_CATALOG}),  # planner statistics in pg_statistic
+    "pg_clear_attribute_stats": frozenset({Effect.WRITES_CATALOG}),
+    "pg_extension_config_dump": frozenset({Effect.WRITES_CATALOG}),  # marks a table in pg_extension
+    "pg_replication_origin_create": frozenset({Effect.WRITES_CATALOG}),
+    "pg_replication_origin_drop": frozenset({Effect.WRITES_CATALOG}),
     # The server's version, configuration, logs, write-ahead log and statistics.
     "version": frozenset({Effect.READS_SERVER}),
     "unicode_version": frozenset({Effect.READS_SERVER}),
@@ -660,6 +701,31 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     "pg_reload_conf": frozenset({Effect.WRITES_SERVER}),
     "pg_rotate_logfile": frozenset({Effect.WRITES_SERVER}),
     "pg_switch_wal": frozenset({Effect.WRITES_SERVER}),
+    "pg_create_restore_point": frozenset({Effect.WRITES_SERVER}),
+    "pg_log_standby_snapshot": frozenset({Effect.WRITES_SERVER}),
+    "pg_logical_emit_message": frozenset({Effect.WRITES_SERVER}),  # writes it to the write-ahead log
+    "pg_backup_start": frozenset({Effect.WRITES_SERVER}),
+    "pg_backup_stop": frozenset({Effect.WRITES_SERVER}),
+    "pg_promote": frozenset({Effect.WRITES_SERVER}),
+    "pg_wal_replay_pause": frozenset({Effect.WRITES_SERVER}),
+    "pg_wal_replay_resume": frozenset({Effect.WRITES_SERVER}),
+    "pg_export_snapshot": frozenset({Effect.WRITES_SERVER}),  # for other sessions to import
+    "pg_nextoid": frozenset({Effect.WRITES_SERVER}),  # advances the OID counter
+    "pg_stop_making_pinned_objects": frozenset({Effect.WRITES_SERVER}),
+    "pg_create_physical_replication_slot": frozenset({Effect.WRITES_SERVER}),
+    "pg_create_logical_replication_slot": frozenset({Effect.WRITES_SERVER}),
+    "pg_copy_physical_replication_slot": frozenset({Effect.READS_SERVER, Effect.WRITES_SERVER}),
+    "pg_copy_logical_replication_slot": frozenset({Effect.READS_SERVER, Effect.WRITES_SERVER}),
+    "pg_drop_replication_slot": frozenset({Effect.WRITES_SERVER}),
+    "pg_replication_slot_advance": frozenset({Effect.READS_SERVER, Effect.WRITES_SERVER}),
+    "pg_sync_replication_slots": frozenset({Effect.READS_SERVER, Effect.WRITES_SERVER}),
+    "pg_replication_origin_advance": frozenset({Effect.WRITES_SERVER}),
+    # Logical decoding reads changed rows from the write-ahead log through a slot; get also
+    # advances the slot.
+    "pg_logical_slot_peek_changes": frozenset({Effect.READS_DATA, Effect.READS_SERVER}),
+    "pg_logical_slot_peek_binary_changes": frozenset({Effect.READS_DATA, Effect.READS_SERVER}),
+    "pg_logical_slot_get_changes": frozenset({Effect.READS_DATA, Effect.READS_SERVER, Effect.WRITES_SERVER}),
+    "pg_logical_slot_get_binary_changes": frozenset({Effect.READS_DATA, Effect.READS_SERVER, Effect.WRITES_SERVER}),
     "pg_stat_reset": frozenset({Effect.WRITES_SERVER}),
     "pg_stat_reset_shared": frozenset({Effect.WRITES_SERVER}),
     "pg_stat_reset_single_table_counters": frozenset({Effect.WRITES_SERVER}),
@@ -828,6 +894,7 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     "pg_xact_commit_timestamp_origin": frozenset({Effect.READS_SERVER}),
     "pg_last_committed_xact": frozenset({Effect.READS_SERVER}),
     "mxid_age": frozenset({Effect.READS_SERVER}),
+    "pg_prepared_xact": frozenset({Effect.READS_SERVER}),
     # Replication slots and origins.
     "pg_get_replication_slots": frozenset({Effect.READS_SERVER}),
     "pg_show_replication_origin_status": frozenset({Effect.READS_SERVER}),
@@ -839,6 +906,7 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     "pg_cancel_backend": frozenset({Effect.WRITES_PROCESSES}),
     "pg_terminate_backend": frozenset({Effect.WRITES_PROCESSES}),
     "pg_notify": frozenset({Effect.WRITES_PROCESSES}),  # delivered to listening sessions on commit
+    "pg_log_backend_memory_contexts": frozenset({Effect.WRITES_PROCESSES, Effect.WRITES_SERVER}),  # to the log
     "pg_stat_get_activity": frozenset({Effect.READS_PROCESSES}),
     "pg_stat_get_progress_info": frozenset({Effect.READS_PROCESSES}),
     "pg_stat_get_wal_senders": frozenset({Effect.READS_PROCESSES}),
@@ -892,6 +960,23 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     "pg_tablespace_databases": frozenset({Effect.READS_FILES}),  # lists the tablespace's directory
     "lo_import": frozenset({Effect.READS_FILES, Effect.WRITES_DATA}),
     "lo_export": frozenset({Effect.READS_DATA, Effect.WRITES_FILES}),
+    # Large objects. An open one is a descriptor of the session, with a position.
+    "lo_get": frozenset({Effect.READS_DATA}),
+    "lo_put": frozenset({Effect.WRITES_DATA}),
+    "lo_creat": frozenset({Effect.WRITES_DATA}),
+    "lo_create": frozenset({Effect.WRITES_DATA}),
+    "lo_from_bytea": frozenset({Effect.WRITES_DATA}),
+    "lo_unlink": frozenset({Effect.WRITES_DATA}),
+    "lo_open": frozenset({Effect.READS_DATA, Effect.WRITES_SESSION_STATE}),
+    "lo_close": frozenset({Effect.WRITES_SESSION_STATE}),
+    "loread": frozenset({Effect.READS_DATA, Effect.READS_SESSION_STATE, Effect.WRITES_SESSION_STATE}),
+    "lowrite": frozenset({Effect.WRITES_DATA, Effect.READS_SESSION_STATE, Effect.WRITES_SESSION_STATE}),
+    "lo_lseek": frozenset({Effect.READS_SESSION_STATE, Effect.WRITES_SESSION_STATE}),
+    "lo_lseek64": frozenset({Effect.READS_SESSION_STATE, Effect.WRITES_SESSION_STATE}),
+    "lo_tell": frozenset({Effect.READS_SESSION_STATE}),
+    "lo_tell64": frozenset({Effect.READS_SESSION_STATE}),
+    "lo_truncate": frozenset({Effect.WRITES_DATA, Effect.READS_SESSION_STATE}),
+    "lo_truncate64": frozenset({Effect.WRITES_DATA, Effect.READS_SESSION_STATE}),
     # These read tables named by their arguments. The xmlschema forms only describe the columns.
     "table_to_xml": frozenset({Effect.READS_DATA}),
     "table_to_xml_and_xmlschema": frozenset({Effect.READS_DATA}),
@@ -905,6 +990,27 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     # These read the session's open cursor; cursor_to_xml fetches from it and moves it.
     "cursor_to_xml": frozenset({Effect.READS_DATA, Effect.READS_SESSION_STATE, Effect.WRITES_SESSION_STATE}),
     "cursor_to_xmlschema": frozenset({Effect.READS_SESSION_STATE}),
+    # pg_upgrade's functions, which work only in binary upgrade mode. The set_next ones choose
+    # the OIDs of the next objects the session creates.
+    "binary_upgrade_set_next_pg_type_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_array_pg_type_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_multirange_pg_type_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_multirange_array_pg_type_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_heap_pg_class_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_heap_relfilenode": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_index_pg_class_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_index_relfilenode": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_toast_pg_class_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_toast_relfilenode": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_pg_enum_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_pg_authid_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_next_pg_tablespace_oid": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_set_record_init_privs": frozenset({Effect.WRITES_SESSION_STATE}),
+    "binary_upgrade_create_empty_extension": frozenset({Effect.WRITES_CATALOG}),
+    "binary_upgrade_set_missing_value": frozenset({Effect.WRITES_CATALOG}),
+    "binary_upgrade_add_sub_rel_state": frozenset({Effect.WRITES_CATALOG}),
+    "binary_upgrade_replorigin_advance": frozenset({Effect.WRITES_SERVER}),
+    "binary_upgrade_logical_slot_has_caught_up": frozenset({Effect.READS_SERVER}),
     # These run SQL given as text.
     "query_to_xml": frozenset({Effect.OPAQUE}),
     "query_to_xmlschema": frozenset({Effect.OPAQUE}),
@@ -986,6 +1092,22 @@ def _own_effects(node: ast.Node) -> Iterator[Cause]:
             waits = policy == LockWaitPolicy.LockWaitBlock
             if not waits:
                 yield Cause(Effect.READS_LOCKS, node)
+        # A sampling method runs its handler, so one in another schema is user code.
+        case ast.RangeTableSample(method=names, repeatable=seed):
+            if not _is_builtin(names):
+                yield Cause(Effect.OPAQUE, node)
+            else:
+                method = names[-1].sval
+                if method not in ("system", "bernoulli"):
+                    yield Cause(Effect.UNCLASSIFIED, node)
+                elif seed is None:
+                    # Without REPEATABLE, the seed is drawn from the session's random state.
+                    yield Cause(Effect.READS_SESSION_STATE, node)
+                    yield Cause(Effect.WRITES_SESSION_STATE, node)
+        case ast.IntoClause():
+            # SELECT INTO creates a table and fills it.
+            yield Cause(Effect.WRITES_CATALOG, node)
+            yield Cause(Effect.WRITES_DATA, node)
         # Converting a value to a type runs the type's input or cast function.
         case ast.TypeName(names=names):
             if not _is_builtin(names):
@@ -1037,6 +1159,39 @@ def _own_effects(node: ast.Node) -> Iterator[Cause]:
             | ast.RangeFunction()
             | ast.ExplainStmt()
             | ast.DefElem()  # EXPLAIN options
+            | ast.CollateClause()  # a collation names a locale, not code
+            | ast.NamedArgExpr()
+            | ast.ParamRef()
+            | ast.GroupingFunc()
+            | ast.CTESearchClause()
+            | ast.CTECycleClause()
+            | ast.SetToDefault()
+            # XML and SQL/JSON syntax computes like the XML and JSON functions.
+            | ast.RangeTableFunc()
+            | ast.RangeTableFuncCol()
+            | ast.XmlExpr()
+            | ast.XmlSerialize()
+            | ast.JsonObjectConstructor()
+            | ast.JsonArrayConstructor()
+            | ast.JsonArrayQueryConstructor()
+            | ast.JsonAggConstructor()
+            | ast.JsonObjectAgg()
+            | ast.JsonArrayAgg()
+            | ast.JsonKeyValue()
+            | ast.JsonValueExpr()
+            | ast.JsonFormat()
+            | ast.JsonOutput()
+            | ast.JsonReturning()
+            | ast.JsonFuncExpr()
+            | ast.JsonArgument()
+            | ast.JsonBehavior()
+            | ast.JsonIsPredicate()
+            | ast.JsonParseExpr()
+            | ast.JsonScalarExpr()
+            | ast.JsonSerializeExpr()
+            | ast.JsonTable()
+            | ast.JsonTableColumn()
+            | ast.JsonTablePathSpec()
         ):
             pass
         case _:

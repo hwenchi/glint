@@ -46,8 +46,28 @@ def found(sql):
         ("SELECT 1 OPERATOR(public.+) 1", [(Effect.OPAQUE, "A_Expr")]),
         ("SELECT 1 OPERATOR(public.=) ANY (SELECT 1)", [(Effect.OPAQUE, "SubLink")]),
         ("SELECT 1 ORDER BY 1 USING OPERATOR(public.<)", [(Effect.OPAQUE, "SortBy")]),
+        # Sampling
+        ("SELECT * FROM film TABLESAMPLE SYSTEM (1) REPEATABLE (0)", [(Effect.READS_DATA, "RangeVar")]),
+        (
+            "SELECT * FROM film TABLESAMPLE BERNOULLI (1)",
+            [
+                (Effect.READS_DATA, "RangeVar"),
+                (Effect.READS_SESSION_STATE, "RangeTableSample"),
+                (Effect.WRITES_SESSION_STATE, "RangeTableSample"),
+            ],
+        ),
+        ("SELECT * FROM film TABLESAMPLE system_rows (1)", [(Effect.READS_DATA, "RangeVar"), (Effect.UNCLASSIFIED, "RangeTableSample")]),
+        ("SELECT * FROM film TABLESAMPLE public.m (1)", [(Effect.OPAQUE, "RangeTableSample"), (Effect.READS_DATA, "RangeVar")]),
+        # SELECT INTO; u is also taken as a relation read
+        (
+            "SELECT 1 INTO u",
+            [(Effect.READS_DATA, "RangeVar"), (Effect.WRITES_CATALOG, "IntoClause"), (Effect.WRITES_DATA, "IntoClause")],
+        ),
+        # XML and SQL/JSON syntax
+        ("SELECT JSON_OBJECT('a': 1), XMLELEMENT(NAME a), 'x' COLLATE \"C\"", []),
+        ("SELECT * FROM JSON_TABLE('[1]', '$[*]' COLUMNS (x int PATH '$'))", []),
         # Nodes with no classification
-        ("SELECT * FROM film TABLESAMPLE SYSTEM (1)", [(Effect.READS_DATA, "RangeVar"), (Effect.UNCLASSIFIED, "RangeTableSample")]),
+        ("SELECT MERGE_ACTION()", [(Effect.UNCLASSIFIED, "MergeSupportFunc")]),
     ],
 )
 def test_effects(sql, expected):
