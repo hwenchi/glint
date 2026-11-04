@@ -23,6 +23,7 @@ def test_example_is_valid():
         Effect.READS_CATALOG,
         Effect.READS_SESSION_SETTINGS,
         Effect.READS_CLOCK,
+        Effect.READS_RANDOM_SOURCE,
     ]
 
 

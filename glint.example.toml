@@ -35,6 +35,7 @@ allow = [
     # "reads_network",
     # "writes_network",
     "reads_clock",  # every query may read the time, e.g. through 'today' or now()
+    "reads_random_source",  # gen_random_uuid()
     # "opaque",  # code outside pg_catalog
     # "unclassified",  # anything not yet classified
 ]

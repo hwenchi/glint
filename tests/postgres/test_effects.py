@@ -18,6 +18,7 @@ def found(sql):
         ("SELECT nextval('s')", [(Effect.WRITES_DATA, "FuncCall"), (Effect.WRITES_SESSION_STATE, "FuncCall")]),
         ("SELECT pg_catalog.nextval('s')", [(Effect.WRITES_DATA, "FuncCall"), (Effect.WRITES_SESSION_STATE, "FuncCall")]),
         ("SELECT lower('A')", []),
+        ("SELECT gen_random_uuid()", [(Effect.READS_RANDOM_SOURCE, "FuncCall")]),
         ("SELECT mystery(1)", [(Effect.UNCLASSIFIED, "FuncCall")]),
         ("SELECT public.lower('A')", [(Effect.OPAQUE, "FuncCall")]),
         # Relations
