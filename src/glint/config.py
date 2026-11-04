@@ -1,4 +1,4 @@
-"""The config file: where the database is and which model to use.
+"""The config file: where the database is, which model to use and what queries may do.
 
 It holds credentials, so it's kept out of git; glint.example.toml shows the format.
 """
@@ -7,6 +7,8 @@ import tomllib
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
+
+from glint.postgres.effects import Effect
 
 
 class DatabaseConfig(BaseModel):
@@ -24,11 +26,19 @@ class ModelConfig(BaseModel):
     name: str
 
 
+class EffectsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # The effects a query may have. A query with any other effect is rejected.
+    allow: list[Effect]
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     database: DatabaseConfig
     model: ModelConfig
+    effects: EffectsConfig
     # A file to keep the conversation in across restarts. Without it, history is kept only in memory.
     history: Path | None = None
 
