@@ -16,7 +16,7 @@ QUERY_TOOL = {
     "function": {
         "name": "query",
         "description": (
-            "Run a read-only SQL query and see its result. Every query is shown to"
+            "Run SQL and see its result. Every query is shown to"
             " the user as a table; add a Vega-Lite spec to also show it as a chart."
         ),
         "parameters": {
@@ -31,7 +31,7 @@ QUERY_TOOL = {
                         " \"Show the seasonal pattern by comparing months\"."
                     ),
                 },
-                "sql": {"type": "string", "description": "A single SELECT or EXPLAIN SELECT."},
+                "sql": {"type": "string", "description": "One SQL statement."},
                 "spec": {
                     "type": "object",
                     "description": (
@@ -66,7 +66,7 @@ class InvalidToolCall(Exception):
 
 def parse_arguments(name: str, arguments: str) -> QueryArgs:
     if name != QUERY_TOOL["function"]["name"]:
-        raise InvalidToolCall(f"unknown tool {name}")
+        raise InvalidToolCall(f"Unknown tool: {name}.")
     try:
         return QueryArgs.model_validate_json(arguments)
     except ValidationError as e:
