@@ -2,23 +2,31 @@
 
 > As you travel across the open ocean, your gaze drifts over its restless, heaving expanse. Light breaks across the water in countless facets, each one flaring and gone before you can fix on it. Every so often, one tilts toward you at just the right angle, and for an instant, you glimpse a tiny piece of the sun.
 
-Ask questions about a PostgreSQL database in plain language. A language model writes the queries and charts; you see every query it runs.
+## What is this
+
+Glint lets you explore a PostgreSQL database by asking questions in plain language. A language model investigates by writing and running SQL queries, then presents results as tables and charts. Every step exposes its description, SQL, and results.
+
+Glint supports any model with tool calling through an OpenAI-compatible API, including local models served by Ollama.
 
 ## Why
 
-An agent is useful because it runs unsupervised, but its generated programs can't be trusted without being read, and reading them defeats the purpose. Glint avoids that by choosing a task where no action can have a lasting effect, so no action needs approval and the model's quality affects only how much you gain.
+An agent can work without supervision, but its judgment cannot be trusted to keep its actions safe. Human review, or review by another model, is no guarantee either. Judgment can guide a search; safety needs stronger guarantees.
 
-Data exploration fits: its output is a view, not a change, and finding insights is a search over queries that language models narrow well, so anyone can explore a database without programming or data-science skills.
+Glint gets those guarantees by restricting what the agent can do. Database exploration is a good fit: each query returns a result that informs the next, and progress requires only reading data. The model has freedom to choose what to investigate, but no authority to modify the database.
 
-- **Read-only:** one `SELECT` checked against an allowlist, run in a rolled-back read-only transaction.
-- **Bounded:** timeouts, a row limit that fails rather than truncates, one query at a time, 20 steps per message.
-- **No data leaves:** charts are data, never code; links shown as text; no URLs, no `eval`, a strict CSP; results go only to the model.
-- **Local only:** `127.0.0.1`, a token, `Host` and `Origin` checks, history in memory or a private file.
+The model gets one tool: run a SQL query. Before execution, Glint analyzes its possible effects and rejects anything the config does not allow. By default, only reads are permitted. Unrecognized constructs count as effects; database definitions, such as views, are trusted. Queries run in a read-only transaction, so no action requires approval.
 
-Findings are hypotheses: each chart shows its SQL and table so you can check it.
+The safeguards are deliberately small:
+
+- **Read-only:** One `SELECT`, checked by effect analysis and executed in a rolled-back, read-only transaction.
+- **Bounded:** Query timeouts, a row limit that fails rather than truncates, one query at a time, and 20 steps per message.
+- **Private:** Charts are specifications, not scripts. Links are text; the page cannot contact other sites. Results go only to the configured model.
+- **Local:** Bound to `127.0.0.1`, protected by a token and `Host` and `Origin` checks. History stays in memory or a private file.
+
+A query can still consume resources or produce misleading results. Findings are hypotheses, not conclusions. Every chart includes the SQL and result table behind it, so you can inspect the evidence yourself.
 
 ## Run
 
-Copy `glint.example.toml` to `glint.toml`, fill in your database and an OpenAI-compatible model with tool calling, then run `make`.
+Copy `glint.example.toml` to `glint.toml`, configure your database and an OpenAI-compatible model API, then run `make`.
 
-`make dev` uses a sample database and a local Ollama model; `make test` runs the tests.
+`make dev` uses a sample database and local Ollama model. `make test` runs the tests.
