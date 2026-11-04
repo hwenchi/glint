@@ -5,17 +5,22 @@ import pytest
 from psycopg.pq import TransactionStatus
 
 from glint.engine import TooManyRows
+from glint.postgres.checks import check_statement, parse
 from glint.postgres.execute import _transaction, run, with_limit
-from glint.postgres.validate import validate
+
+
+def checked(sql):
+    """The statement, as the engine passes it to run."""
+    return check_statement(parse(sql))
 
 
 def test_with_limit():
-    sql = with_limit(validate("SELECT a FROM t ORDER BY a"), 1001)
+    sql = with_limit(checked("SELECT a FROM t ORDER BY a"), 1001)
     assert sql == "SELECT * FROM (SELECT a FROM t ORDER BY a) AS q LIMIT 1001"
 
 
 def test_with_limit_drops_comments():
-    sql = with_limit(validate("SELECT 'x)' -- comment"), 10)
+    sql = with_limit(checked("SELECT 'x)' -- comment"), 10)
     assert sql == "SELECT * FROM (SELECT 'x)') AS q LIMIT 10"
 
 
@@ -29,37 +34,37 @@ def test_with_limit_drops_comments():
         "VALUES (1), (2)",
     ],
 )
-def test_with_limit_validates(sql):
-    # The executor only runs SQL that passes the validator.
-    validate(with_limit(validate(sql), 10))
+def test_with_limit_passes_checks(sql):
+    # The executor only runs SQL that passes the statement check.
+    checked(with_limit(checked(sql), 10))
 
 
 TIMEOUT = timedelta(seconds=5)
 
 
 def test_run(conn):
-    result = run(conn, validate("SELECT rating, count(*) AS n FROM film GROUP BY rating"), 10, TIMEOUT)
+    result = run(conn, checked("SELECT rating, count(*) AS n FROM film GROUP BY rating"), 10, TIMEOUT)
     assert result.columns == ["rating", "n"]
     assert sum(n for _, n in result.rows) == 1000
 
 
 def test_run_at_max_rows(conn):
-    assert len(run(conn, validate("SELECT film_id FROM film"), 1000, TIMEOUT).rows) == 1000
+    assert len(run(conn, checked("SELECT film_id FROM film"), 1000, TIMEOUT).rows) == 1000
 
 
 def test_run_fails_past_max_rows(conn):
     with pytest.raises(TooManyRows):
-        run(conn, validate("SELECT film_id FROM film"), 999, TIMEOUT)
+        run(conn, checked("SELECT film_id FROM film"), 999, TIMEOUT)
 
 
 def test_run_times_out(conn):
-    stmt = validate("SELECT count(*) FROM generate_series(1, 1000000000)")
+    stmt = checked("SELECT count(*) FROM generate_series(1, 1000000000)")
     with pytest.raises(psycopg.errors.QueryCanceled):
         run(conn, stmt, 10, timedelta(milliseconds=100))
 
 
 def test_run_explain(conn):
-    stmt = validate("EXPLAIN (FORMAT JSON) SELECT * FROM rental ORDER BY rental_date")
+    stmt = checked("EXPLAIN (FORMAT JSON) SELECT * FROM rental ORDER BY rental_date")
     result = run(conn, stmt, 10, TIMEOUT)
     assert result.columns == ["QUERY PLAN"]
     [[plan]] = result.rows
@@ -67,16 +72,16 @@ def test_run_explain(conn):
 
 
 def test_run_explain_analyze_times_out(conn):
-    stmt = validate("EXPLAIN ANALYZE SELECT count(*) FROM generate_series(1, 1000000000)")
+    stmt = checked("EXPLAIN ANALYZE SELECT count(*) FROM generate_series(1, 1000000000)")
     with pytest.raises(psycopg.errors.QueryCanceled):
         run(conn, stmt, 10, timedelta(milliseconds=100))
 
 
 def test_run_leaves_connection_idle(conn):
-    run(conn, validate("SELECT 1"), 10, TIMEOUT)
+    run(conn, checked("SELECT 1"), 10, TIMEOUT)
     assert conn.info.transaction_status == TransactionStatus.IDLE
     with pytest.raises(TooManyRows):
-        run(conn, validate("SELECT film_id FROM film"), 1, TIMEOUT)
+        run(conn, checked("SELECT film_id FROM film"), 1, TIMEOUT)
     assert conn.info.transaction_status == TransactionStatus.IDLE
 
 

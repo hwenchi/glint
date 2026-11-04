@@ -41,7 +41,7 @@ def main() -> None:
     except psycopg.OperationalError as e:
         sys.exit(f"Can't connect to the database: {e}")
 
-    engine = PostgresEngine(conn, MAX_ROWS, TIMEOUT)
+    engine = PostgresEngine(conn, config.effects.allow, MAX_ROWS, TIMEOUT)
     client = OpenAI(base_url=config.model.base_url, api_key=config.model.api_key)
     session = Session(client, config.model.name, engine, history)
 

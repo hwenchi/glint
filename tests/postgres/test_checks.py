@@ -1,0 +1,109 @@
+import pytest
+from pglast import ast
+
+from glint.postgres.checks import (
+    EffectsNotAllowed,
+    InvalidSyntax,
+    ModifyingCTE,
+    NotSelect,
+    SelectInto,
+    StatementCount,
+    check_effects,
+    check_statement,
+    parse,
+)
+from glint.postgres.effects import Effect
+
+DEEP = "SELECT " + "NOT " * 2000 + "true"  # deeper than Python's default recursion limit
+
+
+def test_parse():
+    assert isinstance(parse("SELECT 1"), ast.SelectStmt)
+
+
+@pytest.mark.parametrize(
+    "sql, error",
+    [
+        ("SELEC 1", InvalidSyntax),
+        ("", StatementCount),
+        ("SELECT 1; SELECT 2", StatementCount),
+    ],
+)
+def test_parse_rejects(sql, error):
+    with pytest.raises(error):
+        parse(sql)
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT a FROM t",
+        "VALUES (1), (2)",
+        "SELECT a FROM t UNION ALL SELECT a FROM u",
+        "WITH x AS (SELECT a FROM t) SELECT a FROM x",
+        "EXPLAIN ANALYZE SELECT a FROM t",
+        DEEP,
+    ],
+)
+def test_check_statement_accepts(sql):
+    check_statement(parse(sql))
+
+
+@pytest.mark.parametrize(
+    "sql, error",
+    [
+        ("DELETE FROM t", NotSelect),
+        ("INSERT INTO t VALUES (1)", NotSelect),
+        ("CREATE TABLE t (a int)", NotSelect),
+        ("SET search_path = public", NotSelect),
+        ("EXPLAIN ANALYZE DELETE FROM t", NotSelect),
+        ("SELECT a INTO u FROM t", SelectInto),
+        ("EXPLAIN SELECT a INTO u FROM t", SelectInto),
+        ("WITH x AS (DELETE FROM t RETURNING a) SELECT a FROM x", ModifyingCTE),
+        ("SELECT * FROM (WITH x AS (UPDATE t SET a = 1 RETURNING a) SELECT a FROM x) AS s", ModifyingCTE),
+    ],
+)
+def test_check_statement_rejects(sql, error):
+    with pytest.raises(error):
+        check_statement(parse(sql))
+
+
+@pytest.mark.parametrize(
+    "sql, allow",
+    [
+        ("SELECT 1", []),
+        ("SELECT now() FROM film", [Effect.READS_DATA, Effect.READS_CLOCK]),
+        (DEEP, []),
+    ],
+)
+def test_check_effects_accepts(sql, allow):
+    check_effects(parse(sql), allow)
+
+
+@pytest.mark.parametrize(
+    "sql, allow, not_allowed",
+    [
+        ("SELECT 1 FROM film", [], {Effect.READS_DATA}),
+        ("SELECT now() FROM film", [Effect.READS_DATA], {Effect.READS_CLOCK}),
+        ("SELECT nextval('s') FROM film", [Effect.READS_DATA], {Effect.WRITES_DATA, Effect.WRITES_SESSION}),
+    ],
+)
+def test_check_effects_rejects(sql, allow, not_allowed):
+    with pytest.raises(EffectsNotAllowed) as e:
+        check_effects(parse(sql), allow)
+    assert {cause.effect for cause in e.value.causes} == not_allowed
+
+
+@pytest.mark.parametrize(
+    "sql, cause",
+    [
+        ("SELECT public.f(1)", "opaque: public.f(1)"),
+        ("SELECT 1 FROM film", "reads_data: film"),
+        ("SELECT 1 OPERATOR(public.+) 2", "opaque: 1 OPERATOR(public.+) 2"),
+        ("SELECT 1::public.t", "opaque: public.t"),
+    ],
+)
+def test_check_effects_message(sql, cause):
+    with pytest.raises(EffectsNotAllowed) as e:
+        check_effects(parse(sql), [])
+    assert str(e.value) == f"the query may have effects that are not allowed:\n{cause}"

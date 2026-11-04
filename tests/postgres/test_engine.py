@@ -5,13 +5,16 @@ import psycopg
 import pytest
 
 from glint.engine import Engine, QueryError, Timeout, TooManyRows
+from glint.postgres.checks import Rejected
+from glint.postgres.effects import Effect
 from glint.postgres.engine import PostgresEngine
-from glint.postgres.validate import Rejected
+
+ALLOW = [Effect.READS_DATA, Effect.READS_CATALOG, Effect.READS_SESSION, Effect.READS_CLOCK]
 
 
 @pytest.fixture
 def engine(conn) -> Engine:
-    return PostgresEngine(conn, max_rows=100, timeout=timedelta(seconds=1))
+    return PostgresEngine(conn, ALLOW, max_rows=100, timeout=timedelta(seconds=1))
 
 
 def test_query(engine):
