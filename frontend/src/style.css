@@ -341,3 +341,51 @@ button:disabled {
     opacity: 1;
   }
 }
+
+@media print {
+  /* Paper reads as one document: the serif for everything but code, at a print size. */
+  :root {
+    font-family: var(--serif);
+    font-size: 11pt;
+  }
+
+  .assistant table {
+    font-family: var(--serif);
+  }
+
+  /* Without the bubble, which isn't printed, the user's messages are set apart in italics. */
+  .user {
+    font-style: italic;
+  }
+
+  /* Paper is narrower than the column, so use all of it; the bottom padding was for the message box. */
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
+  /* Nothing to type into or wait for on paper. */
+  form,
+  .working {
+    display: none;
+  }
+
+  /* Closed sections print open. */
+  details::details-content {
+    content-visibility: visible;
+  }
+
+  /* Code and errors wrap, and tables narrow to fit the page, instead of being cut off at its edge. */
+  pre {
+    white-space: pre-wrap;
+  }
+
+  .table-scroll {
+    overflow: visible;
+  }
+
+  th,
+  td {
+    overflow-wrap: anywhere;
+  }
+}
