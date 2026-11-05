@@ -101,28 +101,55 @@ function formatTime(at: string): string {
   return new Date(at).toLocaleTimeString();
 }
 
+// Columns per printed table: on paper, a wide result prints as stacked tables
+// of a few columns each. CSS can't tell how many fit, so the number is fixed.
+const PRINT_COLUMNS = 5;
+
 function ResultTable({ result }: { result: Result }) {
+  const all = result.columns.map((_, i) => i);
   return (
-    <div className="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            {result.columns.map((column, i) => (
-              <th key={i}>{column}</th>
+    <>
+      <div className="table-scroll screen-only">
+        <Table result={result} columns={all} />
+      </div>
+      <div className="print-only">
+        {chunks(all, PRINT_COLUMNS).map((columns, i) => (
+          <Table key={i} result={result} columns={columns} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function chunks<T>(items: T[], size: number): T[][] {
+  const result = [];
+  for (let i = 0; i < items.length; i += size) {
+    result.push(items.slice(i, i + size));
+  }
+  return result;
+}
+
+// The result's columns at the given indexes, in that order.
+function Table({ result, columns }: { result: Result; columns: number[] }) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          {columns.map((j) => (
+            <th key={j}>{result.columns[j]}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {result.rows.map((row, i) => (
+          <tr key={i}>
+            {columns.map((j) => (
+              <td key={j}>{cell(row[j])}</td>
             ))}
           </tr>
-        </thead>
-        <tbody>
-          {result.rows.map((row, i) => (
-            <tr key={i}>
-              {row.map((value, j) => (
-                <td key={j}>{cell(value)}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

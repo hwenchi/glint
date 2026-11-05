@@ -13,6 +13,7 @@
   --error-text: #a65d57; /* errors are routine while exploring, so read quietly */
   --sans: "Source Sans 3 Variable", system-ui, sans-serif;
   --serif: "Source Serif 4 Variable", Georgia, serif;
+  --mono: "Source Code Pro Variable", ui-monospace, monospace;
   font-family: var(--sans);
   font-size: 16px;
   line-height: 1.6;
@@ -210,6 +211,11 @@ summary:hover {
   margin: 0.5rem 0;
 }
 
+pre,
+code {
+  font-family: var(--mono);
+}
+
 pre {
   overflow-x: auto;
   margin: 0.5rem 0 0;
@@ -226,6 +232,11 @@ pre {
   max-width: 100%;
   overflow-x: auto;
   margin-top: 0.5rem;
+}
+
+/* A result's tables for paper, shown only when printing */
+.print-only {
+  display: none;
 }
 
 table {
@@ -353,9 +364,14 @@ button:disabled {
     font-family: var(--serif);
   }
 
-  /* Without the bubble, which isn't printed, the user's messages are set apart in italics. */
+  /* The user's messages open each part of the document, like headings, instead of sitting in bubbles. */
   .user {
-    font-style: italic;
+    max-width: none;
+    margin: 1.75rem 0 0.5rem;
+    padding: 0;
+    background: none;
+    border-radius: 0;
+    font-weight: 600;
   }
 
   /* Paper is narrower than the column, so use all of it; the bottom padding was for the message box. */
@@ -387,5 +403,48 @@ button:disabled {
   th,
   td {
     overflow-wrap: anywhere;
+  }
+
+  /* Results print as stacked tables of a few columns each, instead of one too wide for the page. */
+  .screen-only {
+    display: none;
+  }
+
+  /* Set apart from the text around them on a gray panel. Browsers leave out
+     backgrounds when printing unless asked to keep them. */
+  .print-only {
+    display: block;
+    margin: 0.75rem 0;
+    padding: 0.5rem 0.75rem;
+    background: var(--code);
+    border-radius: 0.5rem;
+    print-color-adjust: exact;
+  }
+
+  /* On the panel, the header's own gray would vanish; its bold text and rule set it apart. */
+  .print-only th {
+    background: none;
+  }
+
+  /* Paper is denser than the screen: tighter cells. */
+  .print-only :is(th, td) {
+    padding: 0.1rem 0.5rem;
+    line-height: 1.3;
+  }
+
+  /* Values in the SQL's monospace: the query's output, not prose. */
+  .print-only table {
+    margin-top: 0.5rem;
+    font-family: var(--mono);
+  }
+
+  .print-only table:first-child {
+    margin-top: 0;
+  }
+
+  /* Charts are drawn for the screen's column; on paper they shrink to fit, keeping their proportions. */
+  .vega-embed svg {
+    max-width: 100%;
+    height: auto;
   }
 }
