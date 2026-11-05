@@ -1,6 +1,7 @@
 import json
 from datetime import UTC, datetime
 
+import pytest
 from openai.types.chat import ChatCompletionMessage
 from pydantic import TypeAdapter
 
@@ -15,6 +16,7 @@ from glint.history import (
     UserMessage,
     from_api,
     to_api,
+    to_api_messages,
 )
 from glint.serialize import Result
 from glint.tool import QueryRun
@@ -57,6 +59,27 @@ def test_invalid_call():
     assert to_api(InvalidCall("call_1", "Unknown tool: execute.")) == {
         "role": "tool", "tool_call_id": "call_1", "content": "Error: Unknown tool: execute.",
     }
+
+
+def query_result(call_id, error=None):
+    result = None if error else Result.from_raw(RAW_RESULT)
+    return QueryResult(call_id, QueryRun(description="d", sql="SELECT 1", spec=None, at=AT, result=result, error=error))
+
+
+@pytest.mark.parametrize(
+    ("recent", "omitted"),
+    [
+        (0, ["call_1", "call_3", "call_4"]),
+        (2, ["call_1"]),
+        (5, []),
+    ],
+)
+def test_to_api_messages_omits_older_results(recent, omitted):
+    # Errors are always sent, and don't count toward the recent results.
+    entries = [UserMessage("hi"), query_result("call_1"), query_result("call_2", "e"), query_result("call_3"), query_result("call_4")]
+    messages = to_api_messages(entries, recent)
+    assert len(messages) == len(entries)
+    assert [m["tool_call_id"] for m in messages if m["content"] == "Omitted."] == omitted
 
 
 def test_history_json():

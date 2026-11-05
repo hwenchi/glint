@@ -43,7 +43,7 @@ def main() -> None:
 
     engine = PostgresEngine(conn, config.effects.allow, MAX_ROWS, TIMEOUT)
     client = OpenAI(base_url=config.model.base_url, api_key=config.model.api_key)
-    session = Session(client, config.model.name, engine, history)
+    session = Session(client, config.model.name, engine, history, config.model.recent_results)
 
     # Bind first so the OS picks a free port, which the app needs for its origin check.
     sock = socket.socket()

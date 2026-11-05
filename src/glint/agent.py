@@ -16,7 +16,7 @@ from glint.history import (
     ToolCall,
     UserMessage,
     from_api,
-    to_api,
+    to_api_messages,
 )
 from glint.prompt import SYSTEM_PROMPT
 from glint.tool import QUERY_TOOL, InvalidToolCall, QueryRun, parse_arguments, run_query
@@ -31,11 +31,12 @@ SYSTEM_MESSAGE = {"role": "system", "content": SYSTEM_PROMPT}
 class Session:
     """The one conversation of this Glint process. Only respond adds to its history."""
 
-    def __init__(self, client: OpenAI, model: str, engine: Engine, history: History):
+    def __init__(self, client: OpenAI, model: str, engine: Engine, history: History, recent_results: int = 20):
         self.client = client
         self.model = model
         self.engine = engine
         self._history = history
+        self.recent_results = recent_results  # results the model sees in full; older ones are omitted
         # A plain Lock, not an RLock: a turn's steps may run on different threads,
         # so it can be released by a thread other than the one that acquired it.
         self._turn = threading.Lock()
@@ -72,7 +73,7 @@ class Session:
                     self._history.extend(interrupted)
                     yield interrupted
                     return
-                messages = [SYSTEM_MESSAGE, *(to_api(entry) for entry in self._history.entries)]
+                messages = [SYSTEM_MESSAGE, *to_api_messages(self._history.entries, self.recent_results)]
                 response = self.client.chat.completions.create(model=self.model, messages=messages, tools=[QUERY_TOOL])
                 reply = from_api(response.choices[0].message)
                 results = []

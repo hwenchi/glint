@@ -121,6 +121,22 @@ def to_api(entry: Entry) -> dict[str, Any]:
             return {"role": "tool", "tool_call_id": tool_call_id, "content": f"Error: {error}"}
 
 
+def to_api_messages(entries: Sequence[Entry], recent: int) -> list[dict[str, Any]]:
+    """The entries as messages for the model, with the rows of all but the most recent results omitted.
+
+    Errors are always sent in full, and don't count toward the recent results.
+    """
+    results = [i for i, e in enumerate(entries) if isinstance(e, QueryResult) and e.run.result is not None]
+    first_included = max(len(results) - recent, 0)
+    omitted = set(results[:first_included])
+    return [to_api_omitted(e) if i in omitted else to_api(e) for i, e in enumerate(entries)]
+
+
+def to_api_omitted(result: QueryResult) -> dict[str, Any]:
+    """The result as a message without its rows, to save the model's context. The model can run the query again."""
+    return {"role": "tool", "tool_call_id": result.tool_call_id, "content": "Omitted."}
+
+
 def from_api(message: ChatCompletionMessage) -> AssistantMessage:
     """The model's reply as an entry."""
     tool_calls = []

@@ -24,6 +24,9 @@ class ModelConfig(BaseModel):
     base_url: str
     api_key: str
     name: str
+    # Query results the model sees in full: the most recent ones. Older results are sent
+    # as "Omitted.", so long sessions fit the model's context; it can run their queries again.
+    recent_results: int = 20
 
 
 class EffectsConfig(BaseModel):
