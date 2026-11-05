@@ -26,9 +26,10 @@ export function Chart({ spec, result }: { spec: Record<string, unknown>; result:
 
   useEffect(() => {
     const values = result.rows.map((row) => Object.fromEntries(result.columns.map((column, i) => [column, row[i]])));
-    // A single chart or layer without its own width fills the card.
-    const fillsCard = !("width" in spec) && ("mark" in spec || "layer" in spec);
-    const specWithData = { ...(fillsCard && { width: "container" }), ...spec, data: { values } } as VisualizationSpec;
+    // A single chart or layer, which has one plot area, fills the card. The model
+    // can't see the page, so its own width is replaced.
+    const fillsCard = "mark" in spec || "layer" in spec;
+    const specWithData = { ...spec, ...(fillsCard && { width: "container" }), data: { values } } as VisualizationSpec;
     const chart = embed(container.current!, specWithData, OPTIONS);
     chart.catch((e: Error) => setError(e.message));
     return () => {
