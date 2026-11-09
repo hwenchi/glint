@@ -4,7 +4,7 @@ import threading
 from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 
-from openai import OpenAI
+from openai import NOT_GIVEN, OpenAI
 
 from glint.engine import Engine
 from glint.history import (
@@ -18,7 +18,7 @@ from glint.history import (
     from_api,
     to_api_messages,
 )
-from glint.prompt import system_prompt
+from glint.prompt import LAST_STEP_NOTE, system_prompt
 from glint.tool import QUERY_TOOL, InvalidToolCall, QueryRun, parse_arguments, run_query
 
 
@@ -77,17 +77,19 @@ class Session:
                     self._history.extend(interrupted)
                     yield interrupted
                     return
-                # The last step must answer. The tool stays listed: some servers reject
-                # tool messages in a request without tools.
+                # The last step must answer, so its request offers no tool.
                 last = step == self.max_steps - 1
                 messages = [self.system_message, *to_api_messages(self._history.entries, self.recent_results)]
+                if last:
+                    # Not in the history: like the system prompt, it's Glint's, not the conversation's.
+                    messages.append({"role": "user", "content": LAST_STEP_NOTE})
                 response = self.client.chat.completions.create(
-                    model=self.model, messages=messages, tools=[QUERY_TOOL], tool_choice="none" if last else "auto"
+                    model=self.model, messages=messages, tools=NOT_GIVEN if last else [QUERY_TOOL]
                 )
                 reply = from_api(response.choices[0].message, response.usage)
                 results = []
                 for call in reply.tool_calls:
-                    # Some servers ignore tool_choice, so calls on the last step are skipped.
+                    # A model may call the tool even when none is offered; on the last step, such calls are skipped.
                     if self._interrupted.is_set() or last:
                         results.append(skip_tool_call(call))
                     else:

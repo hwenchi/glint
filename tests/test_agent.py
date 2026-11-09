@@ -3,7 +3,7 @@ import threading
 
 from fakes import RAW_RESULT, FakeEndpoint, FakeEngine
 from glint.agent import Session, run_tool_call, skip_tool_call
-from glint.prompt import system_prompt
+from glint.prompt import LAST_STEP_NOTE, system_prompt
 from glint.history import AssistantMessage, History, InvalidCall, QueryResult, ToolCall, Usage, UserMessage
 from glint.serialize import Result
 from glint.tool import QUERY_TOOL
@@ -104,12 +104,15 @@ def test_respond_keeps_earlier_turns():
 
 
 def test_respond_stops_after_max_steps():
-    # The fake ignores tool_choice, like some servers, so it calls the tool on the last step too.
+    # The fake calls the tool on the last step too, though none is offered.
     endpoint = FakeEndpoint(AssistantMessage(None, (CALL,)))
     engine = FakeEngine()
     session = Session(endpoint.client(), "fake-model", engine, History(), max_steps=3)
     entries = list(session.respond("loop"))
-    assert [r["tool_choice"] for r in endpoint.requests] == ["auto", "auto", "none"]
+    assert ["tools" in r for r in endpoint.requests] == [True, True, False]
+    note = {"role": "user", "content": LAST_STEP_NOTE}
+    assert [r["messages"][-1] == note for r in endpoint.requests] == [False, False, True]
+    assert UserMessage(LAST_STEP_NOTE) not in session.history
     assert len(engine.queries) == 2  # the last step's call is skipped
     assert entries[-2].run.error == "Canceled."
     assert entries[-1] == AssistantMessage("Stopped after 3 steps without an answer.")
