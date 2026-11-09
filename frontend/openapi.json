@@ -120,6 +120,16 @@
             "title": "Tool Calls",
             "default": []
           },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "kind": {
             "type": "string",
             "const": "assistant",
@@ -317,6 +327,25 @@
           "arguments"
         ],
         "title": "ToolCall"
+      },
+      "Usage": {
+        "properties": {
+          "prompt_tokens": {
+            "type": "integer",
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "title": "Completion Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt_tokens",
+          "completion_tokens"
+        ],
+        "title": "Usage",
+        "description": "The tokens of one model request, as the server counted them."
       },
       "UserMessage": {
         "properties": {

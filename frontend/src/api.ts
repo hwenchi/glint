@@ -58,6 +58,7 @@ export interface components {
              * @default []
              */
             tool_calls: components["schemas"]["ToolCall"][];
+            usage?: components["schemas"]["Usage"] | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -143,6 +144,16 @@ export interface components {
             name: string;
             /** Arguments */
             arguments: string;
+        };
+        /**
+         * Usage
+         * @description The tokens of one model request, as the server counted them.
+         */
+        Usage: {
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
         };
         /** UserMessage */
         UserMessage: {

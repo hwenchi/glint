@@ -97,7 +97,7 @@ def test_message_streams_the_turn(logged_in):
     entries = [json.loads(event.removeprefix("data: ")) for event in events]
     assert entries == [
         {"kind": "user", "text": "Hi"},
-        {"kind": "assistant", "text": "Hello.", "tool_calls": []},
+        {"kind": "assistant", "text": "Hello.", "tool_calls": [], "usage": None},
     ]
     assert logged_in.get("/api/history").json() == entries
 

@@ -4,7 +4,7 @@ import threading
 from fakes import RAW_RESULT, FakeEndpoint, FakeEngine
 from glint.agent import Session, run_tool_call, skip_tool_call
 from glint.prompt import system_prompt
-from glint.history import AssistantMessage, History, InvalidCall, QueryResult, ToolCall, UserMessage
+from glint.history import AssistantMessage, History, InvalidCall, QueryResult, ToolCall, Usage, UserMessage
 from glint.serialize import Result
 from glint.tool import QUERY_TOOL
 
@@ -23,6 +23,12 @@ def test_respond_without_tool_calls():
     system = {"role": "system", "content": system_prompt(100)}
     assert request["messages"] == [system, {"role": "user", "content": "How many G films?"}]
     assert request["tools"] == [QUERY_TOOL]
+
+
+def test_respond_records_usage():
+    answer = AssistantMessage("There are 178 G-rated films.", usage=Usage(120, 8))
+    session = Session(FakeEndpoint(answer).client(), "fake-model", FakeEngine(), History())
+    assert list(session.respond("How many G films?"))[-1] == answer
 
 
 def test_respond_with_tool_call():

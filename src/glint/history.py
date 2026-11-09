@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
+from openai.types import CompletionUsage
 from openai.types.chat import ChatCompletionMessage
 from pydantic import Field, TypeAdapter
 
@@ -30,9 +31,19 @@ class ToolCall:
 
 
 @dataclass(frozen=True)
+class Usage:
+    """The tokens of one model request, as the server counted them."""
+
+    prompt_tokens: int
+    completion_tokens: int
+
+
+@dataclass(frozen=True)
 class AssistantMessage:
     text: str | None
     tool_calls: tuple[ToolCall, ...] = ()
+    # None for messages Glint writes itself, and from servers that don't report usage.
+    usage: Usage | None = None
     kind: Literal["assistant"] = "assistant"
 
 
@@ -137,8 +148,8 @@ def to_api_omitted(result: QueryResult) -> dict[str, Any]:
     return {"role": "tool", "tool_call_id": result.tool_call_id, "content": "Omitted."}
 
 
-def from_api(message: ChatCompletionMessage) -> AssistantMessage:
-    """The model's reply as an entry."""
+def from_api(message: ChatCompletionMessage, usage: CompletionUsage | None = None) -> AssistantMessage:
+    """The model's reply as an entry, with the tokens its request used if the server reported them."""
     tool_calls = []
     for call in message.tool_calls or ():
         match call.type:
@@ -147,4 +158,5 @@ def from_api(message: ChatCompletionMessage) -> AssistantMessage:
             case "custom":
                 # Only a function tool is offered; running this answers it with "unknown tool".
                 tool_calls.append(ToolCall(call.id, call.custom.name, call.custom.input))
-    return AssistantMessage(message.content, tuple(tool_calls))
+    tokens = Usage(usage.prompt_tokens, usage.completion_tokens) if usage else None
+    return AssistantMessage(message.content, tuple(tool_calls), tokens)

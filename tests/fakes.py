@@ -28,7 +28,7 @@ class FakeEndpoint:
     def _handle(self, request):
         self.requests.append(json.loads(request.content))
         reply = self.replies.pop(0) if len(self.replies) > 1 else self.replies[0]
-        return httpx2.Response(200, json={
+        response = {
             "id": "fake",
             "object": "chat.completion",
             "created": 0,
@@ -38,7 +38,14 @@ class FakeEndpoint:
                 "finish_reason": "tool_calls" if reply.tool_calls else "stop",
                 "message": to_api(reply),
             }],
-        })
+        }
+        if reply.usage:
+            response["usage"] = {
+                "prompt_tokens": reply.usage.prompt_tokens,
+                "completion_tokens": reply.usage.completion_tokens,
+                "total_tokens": reply.usage.prompt_tokens + reply.usage.completion_tokens,
+            }
+        return httpx2.Response(200, json=response)
 
 
 class FakeEngine:
