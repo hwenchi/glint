@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", help="the model to use, instead of the config's")
     parser.add_argument("--max-steps", type=int, help="model requests per user message, instead of the config's")
     parser.add_argument("--prompt", help="send this message, print the turn to the terminal, and exit")
+    parser.add_argument("--list-models", action="store_true", help="print the models the config's endpoint offers, and exit")
     return parser.parse_args()
 
 
@@ -38,8 +39,9 @@ def main() -> None:
     args = parse_args()
     path = args.config
     headless = args.prompt is not None  # print one turn to the terminal instead of serving the page
+    serving = not headless and not args.list_models
     page_built = (STATIC / "index.html").exists()
-    if not headless and not page_built:
+    if serving and not page_built:
         sys.exit("The page isn't built: run make build.")
     try:
         config = load_config(path)
@@ -47,6 +49,10 @@ def main() -> None:
         sys.exit(f"No config at {path}: copy glint.example.toml to glint.toml and fill it in.")
     except ValidationError as e:
         sys.exit(f"Invalid config in {path}:\n{e}")
+    client = OpenAI(base_url=config.model.base_url, api_key=config.model.api_key)
+    if args.list_models:
+        list_models(client)
+        return
     history_path = args.history or config.history
     try:
         history = History(history_path)
@@ -58,7 +64,6 @@ def main() -> None:
         sys.exit(f"Can't connect to the database: {e}")
 
     engine = PostgresEngine(conn, config.effects.allow, MAX_ROWS, TIMEOUT)
-    client = OpenAI(base_url=config.model.base_url, api_key=config.model.api_key)
     model = args.model or config.model.name
     max_steps = args.max_steps if args.max_steps is not None else config.model.max_steps
     session = Session(client, model, engine, history, config.model.recent_results, max_steps)
@@ -94,7 +99,7 @@ def run_headless(session: Session, prompt: str) -> None:
             match entry:
                 case AssistantMessage(text=text, usage=usage):
                     if text and text.strip():  # a reply that only calls the tool has none
-                        print(text, flush=True)
+                        print(text.strip(), flush=True)
                     if usage:
                         prompt_tokens += usage.prompt_tokens
                         completion_tokens += usage.completion_tokens
@@ -114,3 +119,9 @@ def run_headless(session: Session, prompt: str) -> None:
     except KeyboardInterrupt:
         print("Interrupted.", flush=True)
     print(f"Tool calls: {calls}, {failed} failed. Tokens: {prompt_tokens:,} prompt, {completion_tokens:,} completion.")
+
+
+def list_models(client: OpenAI) -> None:
+    """Print the models the endpoint offers, one per line."""
+    for id in sorted(m.id for m in client.models.list()):
+        print(id)
