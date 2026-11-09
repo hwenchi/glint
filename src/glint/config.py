@@ -27,6 +27,8 @@ class ModelConfig(BaseModel):
     # Query results the model sees in full: the most recent ones. Older results are sent
     # as "Omitted.", so long sessions fit the model's context; it can run their queries again.
     recent_results: int = 20
+    # Model requests per user message. The last one must answer without querying.
+    max_steps: int = 100
 
 
 class EffectsConfig(BaseModel):

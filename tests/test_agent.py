@@ -2,8 +2,8 @@ import json
 import threading
 
 from fakes import RAW_RESULT, FakeEndpoint, FakeEngine
-from glint import agent
-from glint.agent import SYSTEM_MESSAGE, Session, run_tool_call, skip_tool_call
+from glint.agent import Session, run_tool_call, skip_tool_call
+from glint.prompt import system_prompt
 from glint.history import AssistantMessage, History, InvalidCall, QueryResult, ToolCall, UserMessage
 from glint.serialize import Result
 from glint.tool import QUERY_TOOL
@@ -20,7 +20,8 @@ def test_respond_without_tool_calls():
     assert list(session.history) == entries
     [request] = endpoint.requests
     assert request["model"] == "fake-model"
-    assert request["messages"] == [SYSTEM_MESSAGE, {"role": "user", "content": "How many G films?"}]
+    system = {"role": "system", "content": system_prompt(100)}
+    assert request["messages"] == [system, {"role": "user", "content": "How many G films?"}]
     assert request["tools"] == [QUERY_TOOL]
 
 
@@ -92,16 +93,19 @@ def test_respond_keeps_earlier_turns():
     session = Session(endpoint.client(), "fake-model", FakeEngine(), History())
     list(session.respond("first"))
     list(session.respond("second"))
-    assert endpoint.requests[1]["messages"][0] == SYSTEM_MESSAGE
+    assert endpoint.requests[1]["messages"][0] == {"role": "system", "content": system_prompt(100)}
     assert [m["content"] for m in endpoint.requests[1]["messages"][1:]] == ["first", ANSWER.text, "second"]
 
 
-def test_respond_stops_after_max_steps(monkeypatch):
-    monkeypatch.setattr(agent, "MAX_STEPS", 3)
+def test_respond_stops_after_max_steps():
+    # The fake ignores tool_choice, like some servers, so it calls the tool on the last step too.
     endpoint = FakeEndpoint(AssistantMessage(None, (CALL,)))
-    session = Session(endpoint.client(), "fake-model", FakeEngine(), History())
+    engine = FakeEngine()
+    session = Session(endpoint.client(), "fake-model", engine, History(), max_steps=3)
     entries = list(session.respond("loop"))
-    assert len(endpoint.requests) == 3
+    assert [r["tool_choice"] for r in endpoint.requests] == ["auto", "auto", "none"]
+    assert len(engine.queries) == 2  # the last step's call is skipped
+    assert entries[-2].run.error == "Canceled."
     assert entries[-1] == AssistantMessage("Stopped after 3 steps without an answer.")
 
 

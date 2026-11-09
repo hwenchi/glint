@@ -18,25 +18,29 @@ from glint.history import (
     from_api,
     to_api_messages,
 )
-from glint.prompt import SYSTEM_PROMPT
+from glint.prompt import system_prompt
 from glint.tool import QUERY_TOOL, InvalidToolCall, QueryRun, parse_arguments, run_query
-
-# Model requests per user message, so a model that keeps calling the tool
-# can't run forever when no one is there to interrupt it.
-MAX_STEPS = 100
-
-SYSTEM_MESSAGE = {"role": "system", "content": SYSTEM_PROMPT}
 
 
 class Session:
     """The one conversation of this Glint process. Only respond adds to its history."""
 
-    def __init__(self, client: OpenAI, model: str, engine: Engine, history: History, recent_results: int = 20):
+    def __init__(
+        self,
+        client: OpenAI,
+        model: str,
+        engine: Engine,
+        history: History,
+        recent_results: int = 20,
+        max_steps: int = 100,
+    ):
         self.client = client
         self.model = model
         self.engine = engine
         self._history = history
         self.recent_results = recent_results  # results the model sees in full; older ones are omitted
+        self.max_steps = max_steps  # model requests per user message
+        self.system_message = {"role": "system", "content": system_prompt(max_steps)}
         # A plain Lock, not an RLock: a turn's steps may run on different threads,
         # so it can be released by a thread other than the one that acquired it.
         self._turn = threading.Lock()
@@ -67,18 +71,24 @@ class Session:
             user_message = UserMessage(text)
             self._history.extend(user_message)
             yield user_message
-            for _ in range(MAX_STEPS):
+            for step in range(self.max_steps):
                 if self._interrupted.is_set():
                     interrupted = AssistantMessage("Interrupted.")
                     self._history.extend(interrupted)
                     yield interrupted
                     return
-                messages = [SYSTEM_MESSAGE, *to_api_messages(self._history.entries, self.recent_results)]
-                response = self.client.chat.completions.create(model=self.model, messages=messages, tools=[QUERY_TOOL])
+                # The last step must answer. The tool stays listed: some servers reject
+                # tool messages in a request without tools.
+                last = step == self.max_steps - 1
+                messages = [self.system_message, *to_api_messages(self._history.entries, self.recent_results)]
+                response = self.client.chat.completions.create(
+                    model=self.model, messages=messages, tools=[QUERY_TOOL], tool_choice="none" if last else "auto"
+                )
                 reply = from_api(response.choices[0].message)
                 results = []
                 for call in reply.tool_calls:
-                    if self._interrupted.is_set():
+                    # Some servers ignore tool_choice, so calls on the last step are skipped.
+                    if self._interrupted.is_set() or last:
                         results.append(skip_tool_call(call))
                     else:
                         results.append(run_tool_call(self.engine, call))
@@ -88,7 +98,7 @@ class Session:
                 yield from results
                 if not reply.tool_calls:
                     return
-            stop_message = AssistantMessage(f"Stopped after {MAX_STEPS} steps without an answer.")
+            stop_message = AssistantMessage(f"Stopped after {self.max_steps} steps without an answer.")
             self._history.extend(stop_message)
             yield stop_message
 
