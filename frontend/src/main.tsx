@@ -1,4 +1,4 @@
-import { StrictMode, type SubmitEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, StrictMode, type SubmitEvent, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import "@fontsource-variable/source-code-pro/wght.css";
@@ -72,6 +72,14 @@ function App() {
     }
   }
 
+  // Enter sends; Shift+Enter starts a new line. Not while an input method is composing a character.
+  function sendOnEnter(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      event.currentTarget.form!.requestSubmit();
+    }
+  }
+
   // The turn's stream keeps going until the server ends it with the entry saying so.
   function stop() {
     setStopping(true);
@@ -98,7 +106,13 @@ function App() {
       )}
       {/* Under the welcome until the first message, then pinned to the bottom. */}
       <form onSubmit={send} className={entries.length === 0 ? "start" : undefined}>
-        <input value={text} onChange={(event) => setText(event.target.value)} disabled={running} />
+        <textarea
+          rows={1}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={sendOnEnter}
+          disabled={running}
+        />
         {running ? (
           <button type="button" onClick={stop} disabled={stopping}>
             Stop
