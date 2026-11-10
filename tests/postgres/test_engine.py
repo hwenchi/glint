@@ -49,6 +49,11 @@ def test_errors_for_the_model(engine, sql, error):
         ("SELECT 1 / 0", "division by zero"),
         ("SELECT 'x'::int", 'invalid input syntax for type integer: "x"'),
         ("SELECT (SELECT film_id FROM film)", "more than one row returned by a subquery used as an expression"),
+        (
+            "SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY length) OVER () FROM film",
+            "OVER is not supported for ordered-set aggregate percentile_cont",
+        ),
+        (f"SELECT concat({', '.join(['1'] * 101)})", "cannot pass more than 100 arguments to a function"),
     ],
 )
 def test_sql_errors_for_the_model(engine, sql, message):

@@ -11,8 +11,9 @@ from glint.postgres.effects import Effect
 from glint.postgres.execute import run
 
 # SQLSTATE classes for errors caused by the query itself, which the model can
-# fix: cardinality violation, data exception, syntax error or access rule violation.
-QUERY_ERROR_CLASSES = {"21", "22", "42"}
+# fix: feature not supported, cardinality violation, data exception, insufficient
+# resources (usually a query too big), program limit exceeded, syntax error or access rule violation.
+QUERY_ERROR_CLASSES = {"0A", "21", "22", "53", "54", "42"}
 
 
 class PostgresEngine:
