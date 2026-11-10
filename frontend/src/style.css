@@ -81,6 +81,7 @@ main {
 
 .assistant table {
   margin: 0.75rem 0;
+  overflow-wrap: break-word; /* "anywhere" would let a column narrow until it splits short numbers */
 }
 
 /* Queries with a chart: findings, as cards */
@@ -391,18 +392,13 @@ button:disabled {
     content-visibility: visible;
   }
 
-  /* Code and errors wrap, and tables narrow to fit the page, instead of being cut off at its edge. */
+  /* Code and errors wrap instead of being cut off at the page's edge. */
   pre {
     white-space: pre-wrap;
   }
 
   .table-scroll {
     overflow: visible;
-  }
-
-  th,
-  td {
-    overflow-wrap: anywhere;
   }
 
   /* Results print as stacked tables of a few columns each, instead of one too wide for the page. */
