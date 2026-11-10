@@ -412,11 +412,12 @@ button:disabled {
     font-family: var(--serif);
   }
 
-  /* The user's messages open each part of the document, set in from the left instead of sitting in bubbles. */
+  /* The user's messages open each part of the document, set in as quotes instead of sitting in bubbles. */
   .user {
     max-width: none;
-    margin: 1.75rem 0 0.5rem;
-    padding: 0 0 0 2rem;
+    margin: 1.75rem 0 0.5rem 3rem;
+    padding: 0 1.25rem 0 0;
+    border-right: 3px solid #d0d7de; /* a quote's line, on the side the bubbles sit on screen */
     background: none;
     border-radius: 0;
   }
