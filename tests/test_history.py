@@ -118,18 +118,18 @@ def message(**fields):
 
 
 def test_from_api_text():
-    assert from_api(message(content="hello")) == AssistantMessage("hello")
+    assert from_api(message(content="hello"), "m") == AssistantMessage("hello", model="m")
 
 
 def test_from_api_function_call():
     reply = message(content=None, tool_calls=[
         {"id": "call_1", "type": "function", "function": {"name": "query", "arguments": CALL.arguments}},
     ])
-    assert from_api(reply) == AssistantMessage(None, (CALL,))
+    assert from_api(reply, "m") == AssistantMessage(None, (CALL,), model="m")
 
 
 def test_from_api_custom_call():
     reply = message(content=None, tool_calls=[
         {"id": "call_2", "type": "custom", "custom": {"name": "shell", "input": "ls"}},
     ])
-    assert from_api(reply) == AssistantMessage(None, (ToolCall("call_2", "shell", "ls"),))
+    assert from_api(reply, "m") == AssistantMessage(None, (ToolCall("call_2", "shell", "ls"),), model="m")

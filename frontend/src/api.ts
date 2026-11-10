@@ -59,6 +59,8 @@ export interface components {
              */
             tool_calls: components["schemas"]["ToolCall"][];
             usage?: components["schemas"]["Usage"] | null;
+            /** Model */
+            model?: string | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}

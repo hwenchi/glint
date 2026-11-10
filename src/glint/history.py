@@ -44,6 +44,7 @@ class AssistantMessage:
     tool_calls: tuple[ToolCall, ...] = ()
     # None for messages Glint writes itself, and from servers that don't report usage.
     usage: Usage | None = None
+    model: str | None = None  # as Glint asked for it; None for messages Glint writes itself
     kind: Literal["assistant"] = "assistant"
 
 
@@ -148,8 +149,8 @@ def to_api_omitted(result: QueryResult) -> dict[str, Any]:
     return {"role": "tool", "tool_call_id": result.tool_call_id, "content": "Omitted."}
 
 
-def from_api(message: ChatCompletionMessage, usage: CompletionUsage | None = None) -> AssistantMessage:
-    """The model's reply as an entry, with the tokens its request used if the server reported them."""
+def from_api(message: ChatCompletionMessage, model: str, usage: CompletionUsage | None = None) -> AssistantMessage:
+    """The model's reply as an entry, with the model asked for and the tokens its request used if the server reported them."""
     tool_calls = []
     for call in message.tool_calls or ():
         match call.type:
@@ -159,4 +160,4 @@ def from_api(message: ChatCompletionMessage, usage: CompletionUsage | None = Non
                 # Only a function tool is offered; running this answers it with "unknown tool".
                 tool_calls.append(ToolCall(call.id, call.custom.name, call.custom.input))
     tokens = Usage(usage.prompt_tokens, usage.completion_tokens) if usage else None
-    return AssistantMessage(message.content, tuple(tool_calls), tokens)
+    return AssistantMessage(message.content, tuple(tool_calls), tokens, model)

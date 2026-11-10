@@ -9,7 +9,8 @@ from glint.serialize import Result
 from glint.tool import QUERY_TOOL
 
 CALL = ToolCall("call_1", "query", '{"description": "Films per rating", "sql": "SELECT 1"}')
-ANSWER = AssistantMessage("There are 178 G-rated films.")
+ANSWER = AssistantMessage("There are 178 G-rated films.", model="fake-model")
+CALL_REPLY = AssistantMessage(None, (CALL,), model="fake-model")
 
 
 def test_respond_without_tool_calls():
@@ -26,18 +27,18 @@ def test_respond_without_tool_calls():
 
 
 def test_respond_records_usage():
-    answer = AssistantMessage("There are 178 G-rated films.", usage=Usage(120, 8))
+    answer = AssistantMessage("There are 178 G-rated films.", usage=Usage(120, 8), model="fake-model")
     session = Session(FakeEndpoint(answer).client(), "fake-model", FakeEngine(), History())
     assert list(session.respond("How many G films?"))[-1] == answer
 
 
 def test_respond_with_tool_call():
-    endpoint = FakeEndpoint(AssistantMessage(None, (CALL,)), ANSWER)
+    endpoint = FakeEndpoint(CALL_REPLY, ANSWER)
     engine = FakeEngine()
     session = Session(endpoint.client(), "fake-model", engine, History())
     entries = list(session.respond("How many G films?"))
     assert [type(e) for e in entries] == [UserMessage, AssistantMessage, QueryResult, AssistantMessage]
-    assert entries[1] == AssistantMessage(None, (CALL,))
+    assert entries[1] == CALL_REPLY
     assert entries[2].run.result == Result.from_raw(RAW_RESULT)
     assert engine.queries == ["SELECT 1"]
     # The second request carries the call and its result, and nothing the model shouldn't see.
@@ -62,11 +63,11 @@ def test_respond_continues_saved_history(tmp_path):
 
 def test_stopping_early_leaves_valid_history():
     # As when the browser disconnects: the caller stops right after the tool call.
-    endpoint = FakeEndpoint(AssistantMessage(None, (CALL,)), ANSWER)
+    endpoint = FakeEndpoint(CALL_REPLY, ANSWER)
     session = Session(endpoint.client(), "fake-model", FakeEngine(), History())
     turn = session.respond("How many G films?")
     assert next(turn) == UserMessage("How many G films?")
-    assert next(turn) == AssistantMessage(None, (CALL,))
+    assert next(turn) == CALL_REPLY
     turn.close()
     assert [type(e) for e in session.history] == [UserMessage, AssistantMessage, QueryResult]
 
@@ -105,7 +106,7 @@ def test_respond_keeps_earlier_turns():
 
 def test_respond_stops_after_max_steps():
     # The fake calls the tool on the last step too, though none is offered.
-    endpoint = FakeEndpoint(AssistantMessage(None, (CALL,)))
+    endpoint = FakeEndpoint(CALL_REPLY)
     engine = FakeEngine()
     session = Session(endpoint.client(), "fake-model", engine, History(), max_steps=3)
     entries = list(session.respond("loop"))

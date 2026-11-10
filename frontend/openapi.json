@@ -130,6 +130,17 @@
               }
             ]
           },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "kind": {
             "type": "string",
             "const": "assistant",

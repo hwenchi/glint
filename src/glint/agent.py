@@ -86,7 +86,7 @@ class Session:
                 response = self.client.chat.completions.create(
                     model=self.model, messages=messages, tools=NOT_GIVEN if last else [QUERY_TOOL]
                 )
-                reply = from_api(response.choices[0].message, response.usage)
+                reply = from_api(response.choices[0].message, self.model, response.usage)
                 results = []
                 for call in reply.tool_calls:
                     # A model may call the tool even when none is offered; on the last step, such calls are skipped.
