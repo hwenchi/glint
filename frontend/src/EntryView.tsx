@@ -26,7 +26,23 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
       const hasText = Boolean(entry.text?.trim());
       return hasText || entry.model ? (
         <div className="assistant">
-          {entry.model && <p className="model">{entry.model}</p>}
+          {entry.model && (
+            <p className="byline">
+              <span className="model">{entry.model}</span>
+              {entry.usage && (
+                <span className="tokens">
+                  <span title="Tokens sent to the model">
+                    <Arrow up />
+                    {entry.usage.prompt_tokens.toLocaleString()}
+                  </span>
+                  <span title="Tokens the model wrote">
+                    <Arrow up={false} />
+                    {entry.usage.completion_tokens.toLocaleString()}
+                  </span>
+                </span>
+              )}
+            </p>
+          )}
           {/* Links and images become their text: a click or a load would send a request out. */}
           {hasText && (
             <ReactMarkdown
@@ -52,6 +68,15 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
       );
   }
 });
+
+// Drawn rather than typed: the bundled fonts may not have arrows.
+function Arrow({ up }: { up: boolean }) {
+  return (
+    <svg className="arrow" viewBox="0 0 8 14" aria-hidden="true">
+      <path d={up ? "M1 1h6M4 13V4M1 7l3-3 3 3" : "M1 13h6M4 1v9M1 7l3 3 3-3"} />
+    </svg>
+  );
+}
 
 // A query with a chart is a finding: a card showing the chart, with its SQL,
 // table and spec a click away. Any other query is a step: one line that opens
