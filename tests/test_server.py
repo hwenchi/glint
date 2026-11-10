@@ -6,11 +6,12 @@ from fastapi.testclient import TestClient
 from fakes import FakeEndpoint, FakeEngine
 from glint.agent import Session
 from glint.history import AssistantMessage, History
-from glint.server import CSP, TOKEN_COOKIE, create_app
+from glint.server import CSP, create_app, token_cookie
 
 TOKEN = "secret-token"
 PORT = 8765
 ORIGIN = f"http://127.0.0.1:{PORT}"
+TOKEN_COOKIE = token_cookie(PORT)
 
 
 @pytest.fixture
@@ -55,6 +56,13 @@ def test_without_valid_token(client, path):
 def test_wrong_cookie(client):
     client.cookies.set(TOKEN_COOKIE, "wrong")
     assert client.get("/ping").status_code == 403
+
+
+def test_another_glints_cookie_is_kept(client):
+    # Another Glint on this host, on another port, sets its own cookie; this one's still works.
+    client.cookies.set(token_cookie(PORT + 1), "other-token")
+    client.cookies.set(TOKEN_COOKIE, TOKEN)
+    assert client.get("/ping").status_code == 200
 
 
 @pytest.mark.parametrize("host", ["evil.example", "evil.example:8765", "192.168.1.5"])

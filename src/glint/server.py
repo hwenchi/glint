@@ -12,7 +12,11 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from glint.agent import Session
 from glint.history import ENTRY, Entry
 
-TOKEN_COOKIE = "glint_token"
+
+def token_cookie(port: int) -> str:
+    """The cookie's name. Browsers share cookies across a host's ports, so each Glint needs its own."""
+    return f"glint_token_{port}"
+
 
 # Only Glint's own files may run or load, and nothing may leave the page.
 CSP = "; ".join([
@@ -47,6 +51,7 @@ def create_app(session: Session, token: str, port: int) -> FastAPI:
     # the CSP forbids. The schema is still available as app.openapi().
     app = FastAPI(openapi_url=None)
     origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
+    cookie = token_cookie(port)
 
     def valid(given: str) -> bool:
         return secrets.compare_digest(given.encode(), token.encode())
@@ -75,9 +80,9 @@ def create_app(session: Session, token: str, port: int) -> FastAPI:
                 return PlainTextResponse("invalid token", status_code=403)
             # Drop the token from the URL so it isn't left in the address bar or history.
             response = RedirectResponse(str(request.url.remove_query_params("token")), status_code=303)
-            response.set_cookie(TOKEN_COOKIE, token, httponly=True, samesite="strict")
+            response.set_cookie(cookie, token, httponly=True, samesite="strict")
             return response
-        cookie_token = request.cookies.get(TOKEN_COOKIE, "")
+        cookie_token = request.cookies.get(cookie, "")
         if not valid(cookie_token):
             return PlainTextResponse("missing or invalid token", status_code=403)
         return await call_next(request)
