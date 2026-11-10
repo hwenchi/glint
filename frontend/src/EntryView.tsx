@@ -20,22 +20,27 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
   switch (entry.kind) {
     case "user":
       return <p className="user">{entry.text}</p>;
-    case "assistant":
+    case "assistant": {
       // A reply that only calls the tool has no text, or only whitespace; its
-      // queries show as their own entries.
-      return entry.text?.trim() ? (
+      // queries show as their own entries, after its model.
+      const hasText = Boolean(entry.text?.trim());
+      return hasText || entry.model ? (
         <div className="assistant">
+          {entry.model && <p className="model">{entry.model}</p>}
           {/* Links and images become their text: a click or a load would send a request out. */}
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            disallowedElements={["a", "img"]}
-            unwrapDisallowed
-            components={MARKDOWN_COMPONENTS}
-          >
-            {entry.text}
-          </ReactMarkdown>
+          {hasText && (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              disallowedElements={["a", "img"]}
+              unwrapDisallowed
+              components={MARKDOWN_COMPONENTS}
+            >
+              {entry.text}
+            </ReactMarkdown>
+          )}
         </div>
       ) : null;
+    }
     case "query_result":
       return <QueryRunView run={entry.run} />;
     case "invalid_call":
