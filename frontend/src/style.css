@@ -69,7 +69,15 @@ main {
   padding: 1.1rem 1.5rem;
   background: var(--accent-soft);
   border-radius: 1.1rem 1.1rem 0.25rem 1.1rem;
-  white-space: pre-wrap;
+}
+
+/* The padding alone sets the bubble's edges. */
+.user > :first-child {
+  margin-top: 0;
+}
+
+.user > :last-child {
+  margin-bottom: 0;
 }
 
 /* The assistant's replies, as plain text */
@@ -122,6 +130,35 @@ main {
   stroke-linejoin: round;
 }
 
+/* The model's thinking before the reply: quieter than the reply, set off by the tag's green */
+.assistant .reasoning {
+  margin: 0.25rem 0 0.5rem;
+}
+
+/* Its label matches the steps': the reply's serif would set it apart. */
+.assistant .reasoning > summary {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+.assistant .reasoning > div {
+  margin-top: 0.25rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--tag);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* No gap above the first line or below the last: the rule spans the text alone. */
+.assistant .reasoning > div > :first-child {
+  margin-top: 0;
+}
+
+.assistant .reasoning > div > :last-child {
+  margin-bottom: 0;
+}
+
 .assistant table {
   margin: 0.75rem 0;
   overflow-wrap: break-word; /* "anywhere" would let a column narrow until it splits short numbers */
@@ -172,12 +209,14 @@ main {
   white-space: nowrap;
 }
 
-.step > summary span::before {
-  content: "▸ ";
+/* The same triangle as other sections', drawn by the text since the flex row drops the summary's own. */
+.step > summary span {
+  display: list-item;
+  list-style: disclosure-closed inside;
 }
 
-.step[open] > summary span::before {
-  content: "▾ ";
+.step[open] > summary span {
+  list-style-type: disclosure-open;
 }
 
 .step.failed {
@@ -437,6 +476,20 @@ button:disabled {
   /* Closed sections print open. */
   details::details-content {
     content-visibility: visible;
+  }
+
+  /* Open, they need no arrow. */
+  summary {
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .step > summary span,
+  .step[open] > summary span {
+    list-style: none;
   }
 
   /* Code and errors wrap instead of being cut off at the page's edge. */

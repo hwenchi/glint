@@ -61,6 +61,8 @@ export interface components {
             usage?: components["schemas"]["Usage"] | null;
             /** Model */
             model?: string | null;
+            /** Reasoning */
+            reasoning?: string | null;
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}

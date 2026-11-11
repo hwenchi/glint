@@ -45,6 +45,8 @@ class AssistantMessage:
     # None for messages Glint writes itself, and from servers that don't report usage.
     usage: Usage | None = None
     model: str | None = None  # as Glint asked for it; None for messages Glint writes itself
+    # The model's thinking before the reply, for the page. It isn't sent back to the model.
+    reasoning: str | None = None
     kind: Literal["assistant"] = "assistant"
 
 
@@ -160,4 +162,7 @@ def from_api(message: ChatCompletionMessage, model: str, usage: CompletionUsage 
                 # Only a function tool is offered; running this answers it with "unknown tool".
                 tool_calls.append(ToolCall(call.id, call.custom.name, call.custom.input))
     tokens = Usage(usage.prompt_tokens, usage.completion_tokens) if usage else None
-    return AssistantMessage(message.content, tuple(tool_calls), tokens, model)
+    # Not part of the API: servers add it as a field of their own, under one of these names.
+    extra = message.model_extra or {}
+    reasoning = extra.get("reasoning_content") or extra.get("reasoning")
+    return AssistantMessage(message.content, tuple(tool_calls), tokens, model, reasoning)

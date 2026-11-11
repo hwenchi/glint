@@ -30,7 +30,8 @@ def test_user_message():
 
 
 def test_assistant_message():
-    assert to_api(AssistantMessage("hello")) == {"role": "assistant", "content": "hello"}
+    # The reasoning is for the page only.
+    assert to_api(AssistantMessage("hello", reasoning="Greet back.")) == {"role": "assistant", "content": "hello"}
 
 
 def test_assistant_message_with_tool_calls():
@@ -119,6 +120,12 @@ def message(**fields):
 
 def test_from_api_text():
     assert from_api(message(content="hello"), "m") == AssistantMessage("hello", model="m")
+
+
+@pytest.mark.parametrize("field", ["reasoning_content", "reasoning"])
+def test_from_api_reasoning(field):
+    reply = message(content="hello", **{field: "Greet back."})
+    assert from_api(reply, "m") == AssistantMessage("hello", model="m", reasoning="Greet back.")
 
 
 def test_from_api_function_call():

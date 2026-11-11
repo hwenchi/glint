@@ -19,7 +19,11 @@ const MARKDOWN_COMPONENTS: Components = {
 export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
   switch (entry.kind) {
     case "user":
-      return <p className="user">{entry.text}</p>;
+      return (
+        <div className="user">
+          <Markdown text={entry.text} />
+        </div>
+      );
     case "assistant": {
       // A reply that only calls the tool has no text, or only whitespace; its
       // queries show as their own entries, after its model.
@@ -43,17 +47,15 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
               )}
             </p>
           )}
-          {/* Links and images become their text: a click or a load would send a request out. */}
-          {hasText && (
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              disallowedElements={["a", "img"]}
-              unwrapDisallowed
-              components={MARKDOWN_COMPONENTS}
-            >
-              {entry.text}
-            </ReactMarkdown>
+          {entry.reasoning?.trim() && (
+            <details className="reasoning">
+              <summary>Reasoning</summary>
+              <div>
+                <Markdown text={entry.reasoning} />
+              </div>
+            </details>
           )}
+          {hasText && <Markdown text={entry.text!} />}
         </div>
       ) : null;
     }
@@ -68,6 +70,20 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
       );
   }
 });
+
+// The model's Markdown. Links and images become their text: a click or a load would send a request out.
+function Markdown({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      disallowedElements={["a", "img"]}
+      unwrapDisallowed
+      components={MARKDOWN_COMPONENTS}
+    >
+      {text}
+    </ReactMarkdown>
+  );
+}
 
 // Drawn rather than typed: the bundled fonts may not have arrows.
 function Arrow({ up }: { up: boolean }) {
