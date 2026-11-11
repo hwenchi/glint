@@ -24,6 +24,15 @@ def test_respond_without_tool_calls():
     system = {"role": "system", "content": system_prompt(100)}
     assert request["messages"] == [system, {"role": "user", "content": "How many G films?"}]
     assert request["tools"] == [QUERY_TOOL]
+    assert "reasoning_effort" not in request
+
+
+def test_respond_sends_reasoning_effort():
+    endpoint = FakeEndpoint(ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), reasoning_effort="medium")
+    list(session.respond("How many G films?"))
+    [request] = endpoint.requests
+    assert request["reasoning_effort"] == "medium"
 
 
 def test_respond_records_usage():

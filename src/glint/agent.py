@@ -5,6 +5,7 @@ from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 
 from openai import NOT_GIVEN, OpenAI
+from openai.types.shared import ReasoningEffort
 
 from glint.engine import Engine
 from glint.history import (
@@ -33,6 +34,7 @@ class Session:
         history: History,
         recent_results: int = 20,
         max_steps: int = 100,
+        reasoning_effort: ReasoningEffort = None,
     ):
         self.client = client
         self.model = model
@@ -40,6 +42,7 @@ class Session:
         self._history = history
         self.recent_results = recent_results  # results the model sees in full; older ones are omitted
         self.max_steps = max_steps  # model requests per user message
+        self.reasoning_effort = reasoning_effort  # sent only when set
         self.system_message = {"role": "system", "content": system_prompt(max_steps)}
         # A plain Lock, not an RLock: a turn's steps may run on different threads,
         # so it can be released by a thread other than the one that acquired it.
@@ -84,7 +87,10 @@ class Session:
                     # Not in the history: like the system prompt, it's Glint's, not the conversation's.
                     messages.append({"role": "user", "content": LAST_STEP_NOTE})
                 response = self.client.chat.completions.create(
-                    model=self.model, messages=messages, tools=NOT_GIVEN if last else [QUERY_TOOL]
+                    model=self.model,
+                    messages=messages,
+                    tools=NOT_GIVEN if last else [QUERY_TOOL],
+                    reasoning_effort=self.reasoning_effort or NOT_GIVEN,
                 )
                 reply = from_api(response.choices[0].message, self.model, response.usage)
                 results = []

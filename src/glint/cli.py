@@ -22,6 +22,8 @@ from glint.server import STATIC, create_app
 
 MAX_ROWS = 500
 TIMEOUT = timedelta(seconds=30)
+# The values the pinned client's ReasoningEffort allows.
+REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,6 +32,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--history", type=Path, help="the file to keep the conversation in, instead of the config's")
     parser.add_argument("--model", help="the model to use, instead of the config's")
     parser.add_argument("--max-steps", type=int, help="model requests per user message, instead of the config's")
+    parser.add_argument(
+        "--reasoning-effort", choices=REASONING_EFFORTS, help="the request's reasoning_effort, instead of the config's"
+    )
     parser.add_argument("--prompt", help="send this message, print the turn to the terminal, and exit")
     parser.add_argument("--list-models", action="store_true", help="print the models the config's endpoint offers, and exit")
     return parser.parse_args()
@@ -66,7 +71,8 @@ def main() -> None:
     engine = PostgresEngine(conn, config.effects.allow, MAX_ROWS, TIMEOUT)
     model = args.model or config.model.name
     max_steps = args.max_steps if args.max_steps is not None else config.model.max_steps
-    session = Session(client, model, engine, history, config.model.recent_results, max_steps)
+    reasoning_effort = args.reasoning_effort or config.model.reasoning_effort
+    session = Session(client, model, engine, history, config.model.recent_results, max_steps, reasoning_effort)
     if headless:
         run_headless(session, args.prompt)
     else:

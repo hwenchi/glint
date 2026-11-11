@@ -6,6 +6,7 @@ It holds credentials, so it's kept out of git; glint.example.toml shows the form
 import tomllib
 from pathlib import Path
 
+from openai.types.shared import ReasoningEffort
 from pydantic import BaseModel, ConfigDict
 
 from glint.postgres.effects import Effect
@@ -29,6 +30,9 @@ class ModelConfig(BaseModel):
     recent_results: int = 20
     # Model requests per user message. The last one must answer without querying.
     max_steps: int = 100
+    # Sent as the request's reasoning_effort, such as "medium". Unset, it isn't sent:
+    # some endpoints reject it, and the model keeps its own default.
+    reasoning_effort: ReasoningEffort = None
 
 
 class EffectsConfig(BaseModel):
