@@ -453,8 +453,8 @@ button:disabled {
 
   /* The user's messages open each part of the document, set in as quotes instead of sitting in bubbles. */
   .user {
-    max-width: none;
-    margin: 1.75rem 0 0.5rem 3rem;
+    max-width: calc(100% - 3rem); /* set in from the left, as a quote */
+    margin: 1.75rem 0 0.5rem auto; /* on the right, as the bubbles are on screen */
     padding: 0 1.25rem 0 0;
     border-right: 3px solid #d0d7de; /* a quote's line, on the side the bubbles sit on screen */
     background: none;
@@ -476,6 +476,11 @@ button:disabled {
   /* Closed sections print open. */
   details::details-content {
     content-visibility: visible;
+  }
+
+  /* Browsers darken light text when printing without backgrounds; the reasoning stays grey. */
+  .assistant .reasoning > div {
+    print-color-adjust: exact;
   }
 
   /* Open, they need no arrow. */
