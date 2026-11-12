@@ -21,6 +21,11 @@ def found(sql):
         ("SELECT gen_random_uuid()", [(Effect.READS_RANDOM_SOURCE, "FuncCall")]),
         ("SELECT mystery(1)", [(Effect.UNCLASSIFIED, "FuncCall")]),
         ("SELECT public.lower('A')", [(Effect.OPAQUE, "FuncCall")]),
+        # pg_trgm's functions, by name like the built-ins
+        ("SELECT similarity('broccoli', 'brocoli')", []),
+        ("SELECT set_limit(0.5)", [(Effect.WRITES_SESSION_SETTINGS, "FuncCall")]),
+        ("SELECT public.similarity('broccoli', 'brocoli')", [(Effect.OPAQUE, "FuncCall")]),
+        ("SELECT 'broccoli' % 'brocoli'", []),
         # Relations
         ("SELECT * FROM film", [(Effect.READS_DATA, "RangeVar")]),
         ("SELECT * FROM public.film", [(Effect.READS_DATA, "RangeVar")]),

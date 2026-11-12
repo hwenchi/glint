@@ -1208,6 +1208,20 @@ FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
     "ts_rewrite": frozenset({Effect.OPAQUE}),  # with a query given as text
 }
 
+# Functions of the pg_trgm extension (version 1.6), by name like the built-ins.
+# Its operator implementations and index support functions are left unclassified.
+PG_TRGM_FUNCTION_EFFECTS: dict[str, frozenset[Effect]] = {
+    "similarity": NONE,
+    "word_similarity": NONE,
+    "strict_word_similarity": NONE,
+    "show_trgm": NONE,
+    "show_limit": NONE,  # reads pg_trgm.similarity_threshold
+    "set_limit": frozenset({Effect.WRITES_SESSION_SETTINGS}),  # sets pg_trgm.similarity_threshold
+}
+
+# Every function looked up by name. No extension function shares a name with a built-in.
+NAMED_FUNCTION_EFFECTS = FUNCTION_EFFECTS | PG_TRGM_FUNCTION_EFFECTS
+
 # Keywords that read a value without a function call.
 SQL_VALUE_FUNCTION_EFFECTS: dict[SQLValueFunctionOp, frozenset[Effect]] = {
     # The current time, which every query may read. The date and local times are in TimeZone.
@@ -1262,7 +1276,7 @@ def _own_effects(node: ast.Node) -> Iterator[Cause]:
         case ast.FuncCall(funcname=names):
             if _is_builtin(names):
                 name = names[-1].sval
-                found = FUNCTION_EFFECTS.get(name, {Effect.UNCLASSIFIED})
+                found = NAMED_FUNCTION_EFFECTS.get(name, {Effect.UNCLASSIFIED})
                 for effect in found:
                     yield Cause(effect, node)
             else:
