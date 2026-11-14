@@ -68,7 +68,23 @@ class InvalidCall:
     kind: Literal["invalid_call"] = "invalid_call"
 
 
-Entry = Annotated[UserMessage | AssistantMessage | QueryResult | InvalidCall, Field(discriminator="kind")]
+@dataclass(frozen=True)
+class BeliefRevision:
+    """How the model revised its beliefs after a step. Its beliefs are all revisions so far, applied in order.
+
+    Each belief is a statement, numbered when added; numbers are never reused.
+    """
+
+    drop: dict[int, str]  # beliefs it no longer holds, by number, with what they said
+    add: dict[int, str]  # new beliefs, by the numbers Glint gave them
+    usage: Usage | None = None  # of the request that revised them, if the server reported it
+    model: str | None = None  # as Glint asked for it
+    kind: Literal["belief_revision"] = "belief_revision"
+
+
+Entry = Annotated[
+    UserMessage | AssistantMessage | QueryResult | InvalidCall | BeliefRevision, Field(discriminator="kind")
+]
 
 ENTRY = TypeAdapter(Entry)
 
@@ -133,22 +149,6 @@ def to_api(entry: Entry) -> dict[str, Any]:
             return {"role": "tool", "tool_call_id": tool_call_id, "content": result.model_dump_json()}
         case QueryResult(tool_call_id, QueryRun(error=error)) | InvalidCall(tool_call_id, error):
             return {"role": "tool", "tool_call_id": tool_call_id, "content": f"Error: {error}"}
-
-
-def to_api_messages(entries: Sequence[Entry], recent: int) -> list[dict[str, Any]]:
-    """The entries as messages for the model, with the rows of all but the most recent results omitted.
-
-    Errors are always sent in full, and don't count toward the recent results.
-    """
-    results = [i for i, e in enumerate(entries) if isinstance(e, QueryResult) and e.run.result is not None]
-    first_included = max(len(results) - recent, 0)
-    omitted = set(results[:first_included])
-    return [to_api_omitted(e) if i in omitted else to_api(e) for i, e in enumerate(entries)]
-
-
-def to_api_omitted(result: QueryResult) -> dict[str, Any]:
-    """The result as a message without its rows, to save the model's context. The model can run the query again."""
-    return {"role": "tool", "tool_call_id": result.tool_call_id, "content": "Omitted."}
 
 
 def from_api(message: ChatCompletionMessage, model: str, usage: CompletionUsage | None = None) -> AssistantMessage:

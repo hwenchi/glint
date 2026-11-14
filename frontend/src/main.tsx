@@ -7,6 +7,7 @@ import "@fontsource-variable/source-serif-4/opsz.css";
 import "@fontsource-variable/source-serif-4/opsz-italic.css";
 import "./style.css";
 
+import { BeliefsPopup } from "./BeliefsPopup";
 import { interrupt, loadHistory, sendMessage } from "./client";
 import { EntryView } from "./EntryView";
 import type { Entry } from "./types";
@@ -106,6 +107,7 @@ function App() {
       )}
       {/* Under the welcome until the first message, then pinned to the bottom. */}
       <form onSubmit={send} className={entries.length === 0 ? "start" : undefined}>
+        <BeliefsPopup entries={entries} />
         <textarea
           rows={1}
           value={text}

@@ -69,6 +69,30 @@ export interface components {
              */
             kind: "assistant";
         };
+        /**
+         * BeliefRevision
+         * @description How the model revised its beliefs after a step. Its beliefs are all revisions so far, applied in order.
+         *
+         *     Each belief is a statement, numbered when added; numbers are never reused.
+         */
+        BeliefRevision: {
+            /** Drop */
+            drop: {
+                [key: string]: string;
+            };
+            /** Add */
+            add: {
+                [key: string]: string;
+            };
+            usage?: components["schemas"]["Usage"] | null;
+            /** Model */
+            model?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "belief_revision";
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -206,7 +230,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": (components["schemas"]["UserMessage"] | components["schemas"]["AssistantMessage"] | components["schemas"]["QueryResult"] | components["schemas"]["InvalidCall"])[];
+                    "application/json": (components["schemas"]["UserMessage"] | components["schemas"]["AssistantMessage"] | components["schemas"]["QueryResult"] | components["schemas"]["InvalidCall"] | components["schemas"]["BeliefRevision"])[];
                 };
             };
         };

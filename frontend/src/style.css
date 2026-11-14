@@ -92,7 +92,7 @@ main {
 }
 
 /* Above each reply: the model that wrote it, and the tokens its request used */
-.assistant .byline {
+.byline {
   display: flex;
   align-items: baseline;
   gap: 0.75rem;
@@ -100,7 +100,7 @@ main {
   font-family: var(--sans);
 }
 
-.assistant .model {
+.model {
   padding: 0 0.5rem;
   border-radius: 0.375rem;
   background: var(--tag);
@@ -110,7 +110,7 @@ main {
   color: var(--tag-text);
 }
 
-.assistant .tokens {
+.tokens {
   display: flex;
   gap: 0.75rem;
   font-size: 0.75rem;
@@ -118,7 +118,7 @@ main {
   color: var(--muted);
 }
 
-.assistant .tokens .arrow {
+.tokens .arrow {
   width: 0.6em;
   height: 1.05em;
   margin-right: 0.25em;
@@ -225,6 +225,72 @@ main {
 
 .step .error {
   color: var(--error-text);
+}
+
+/* A revision with its byline, spaced like a reply */
+.revision-entry {
+  margin: 1rem 0;
+}
+
+/* A revision of the model's beliefs: the turn's main events, so louder than a query */
+.step.revision {
+  margin: 0.25rem 0 0;
+  padding: 0.35rem 0.75rem;
+  background: color-mix(in srgb, var(--tag) 60%, transparent);
+  border-left: 3px solid var(--tag-text);
+  border-radius: 0 0.4rem 0.4rem 0;
+}
+
+.revision > summary {
+  color: var(--tag-text);
+  font-weight: 600;
+}
+
+.revision > summary small {
+  font-size: inherit;
+  white-space: nowrap;
+}
+
+.revision del,
+.revision ins {
+  text-decoration: none;
+}
+
+.revision del {
+  color: var(--error-text);
+}
+
+.revision ins {
+  color: var(--tag-text);
+}
+
+.revision ul {
+  margin: 0.4rem 0 0.15rem;
+  padding: 0;
+  font-family: var(--mono); /* as in the beliefs popup */
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  list-style: none;
+}
+
+/* Each belief on a band, as lines in a diff */
+.revision li :is(del, ins) {
+  display: block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.revision li del {
+  background: color-mix(in srgb, var(--danger) 10%, var(--card));
+}
+
+.revision li ins {
+  background: var(--tag);
+}
+
+.revision li + li {
+  margin-top: 0.2rem;
 }
 
 /* A finding's description and when it ran */
@@ -399,6 +465,85 @@ button {
 button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Opens the beliefs: beside Send, but quieter */
+.beliefs-button {
+  color: var(--tag-text);
+  background: var(--tag);
+  white-space: nowrap;
+}
+
+/* The model's current beliefs, over the page */
+dialog.beliefs {
+  width: min(40rem, calc(100% - 2rem));
+  padding: 0; /* the content has it, so a click on the padding isn't taken as one outside */
+  color: inherit;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.15);
+}
+
+dialog.beliefs::backdrop {
+  background: rgb(0 0 0 / 0.25);
+}
+
+/* The header stays; the list scrolls. */
+dialog.beliefs > div {
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+}
+
+dialog.beliefs header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+dialog.beliefs h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+dialog.beliefs header label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0.75rem 0 auto;
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+dialog.beliefs header button {
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--code);
+}
+
+dialog.beliefs ol {
+  overflow-y: auto;
+  margin: 0;
+  padding: 1.25rem 1.75rem 1.5rem 3.5rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere; /* long names, like table.column, wrap instead of scrolling sideways */
+}
+
+dialog.beliefs li + li {
+  margin-top: 0.5rem;
+}
+
+/* Beliefs no longer held */
+dialog.beliefs li del {
+  color: var(--muted);
 }
 
 /* While a turn runs: a bubble on the assistant's side with three pulsing dots */

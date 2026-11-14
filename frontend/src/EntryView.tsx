@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 
 import { Chart } from "./Chart";
 import { Code } from "./Code";
-import type { Entry, QueryRun, Result } from "./types";
+import type { BeliefRevision, Entry, QueryRun, Result, Usage } from "./types";
 
 // Tables in replies scroll sideways inside the column, like result tables.
 const MARKDOWN_COMPONENTS: Components = {
@@ -30,23 +30,7 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
       const hasText = Boolean(entry.text?.trim());
       return hasText || entry.model ? (
         <div className="assistant">
-          {entry.model && (
-            <p className="byline">
-              <span className="model">{entry.model}</span>
-              {entry.usage && (
-                <span className="tokens">
-                  <span title="Tokens sent to the model">
-                    <Arrow up />
-                    {entry.usage.prompt_tokens.toLocaleString()}
-                  </span>
-                  <span title="Tokens the model wrote">
-                    <Arrow up={false} />
-                    {entry.usage.completion_tokens.toLocaleString()}
-                  </span>
-                </span>
-              )}
-            </p>
-          )}
+          {entry.model && <Byline model={entry.model} usage={entry.usage} />}
           {entry.reasoning?.trim() && (
             <details className="reasoning">
               <summary>Reasoning</summary>
@@ -68,8 +52,45 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
           <p>{entry.error}</p>
         </details>
       );
+    case "belief_revision":
+      return <RevisionView revision={entry} />;
   }
 });
+
+// One line that opens to the beliefs dropped and added.
+function RevisionView({ revision }: { revision: BeliefRevision }) {
+  const dropped = Object.entries(revision.drop);
+  const added = Object.entries(revision.add);
+  return (
+    <div className="revision-entry">
+      {revision.model && <Byline model={revision.model} usage={revision.usage} />}
+      <details className="step revision">
+        <summary>
+          <span>Revised beliefs</span>
+          <small>
+            <del>−{dropped.length}</del> <ins>+{added.length}</ins>
+          </small>
+        </summary>
+        <ul>
+          {dropped.map(([number, statement]) => (
+            <li key={number}>
+              <del>
+                {number}. {statement}
+              </del>
+            </li>
+          ))}
+          {added.map(([number, statement]) => (
+            <li key={number}>
+              <ins>
+                {number}. {statement}
+              </ins>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
+  );
+}
 
 // The model's Markdown. Links and images become their text: a click or a load would send a request out.
 function Markdown({ text }: { text: string }) {
@@ -82,6 +103,27 @@ function Markdown({ text }: { text: string }) {
     >
       {text}
     </ReactMarkdown>
+  );
+}
+
+// The model that wrote an entry, and the tokens its request used.
+function Byline({ model, usage }: { model: string; usage?: Usage | null }) {
+  return (
+    <p className="byline">
+      <span className="model">{model}</span>
+      {usage && (
+        <span className="tokens">
+          <span title="Tokens sent to the model">
+            <Arrow up />
+            {usage.prompt_tokens.toLocaleString()}
+          </span>
+          <span title="Tokens the model wrote">
+            <Arrow up={false} />
+            {usage.completion_tokens.toLocaleString()}
+          </span>
+        </span>
+      )}
+    </p>
   );
 }
 

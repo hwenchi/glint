@@ -1,4 +1,4 @@
-"""The one tool the model has: run a query, optionally with a chart."""
+"""The model's tools: run a query, optionally with a chart, and revise its beliefs."""
 
 from datetime import UTC, datetime
 from typing import Any
@@ -61,7 +61,7 @@ class QueryArgs(BaseModel):
 
 
 class InvalidToolCall(Exception):
-    """The model's tool call doesn't fit QUERY_TOOL. The message is meant for the model."""
+    """The model's tool call doesn't fit the tool's definition. The message is meant for the model."""
 
 
 def parse_arguments(name: str, arguments: str) -> QueryArgs:
@@ -69,6 +69,45 @@ def parse_arguments(name: str, arguments: str) -> QueryArgs:
         raise InvalidToolCall(f"Unknown tool: {name}.")
     try:
         return QueryArgs.model_validate_json(arguments)
+    except ValidationError as e:
+        raise InvalidToolCall(str(e)) from None
+
+
+REVISE_BELIEFS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "revise_beliefs",
+        "description": (
+            "Revise your beliefs: drop the ones you no longer hold, by number, and add new ones."
+            " Either list may be empty."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "drop": {"type": "array", "items": {"type": "integer"}, "description": "Numbers of the beliefs to drop."},
+                "add": {"type": "array", "items": {"type": "string"}, "description": "New beliefs, one statement each."},
+            },
+            "required": ["drop", "add"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+class ReviseBeliefsArgs(BaseModel):
+    """Parses the revise_beliefs tool's arguments, exactly as REVISE_BELIEFS_TOOL gives them: no conversions."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    drop: list[int]
+    add: list[str]
+
+
+def parse_revise_beliefs_arguments(name: str, arguments: str) -> ReviseBeliefsArgs:
+    if name != REVISE_BELIEFS_TOOL["function"]["name"]:
+        raise InvalidToolCall(f"Unknown tool: {name}.")
+    try:
+        return ReviseBeliefsArgs.model_validate_json(arguments)
     except ValidationError as e:
         raise InvalidToolCall(str(e)) from None
 

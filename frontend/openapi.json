@@ -28,6 +28,9 @@
                       },
                       {
                         "$ref": "#/components/schemas/InvalidCall"
+                      },
+                      {
+                        "$ref": "#/components/schemas/BeliefRevision"
                       }
                     ],
                     "discriminator": {
@@ -36,7 +39,8 @@
                         "user": "#/components/schemas/UserMessage",
                         "assistant": "#/components/schemas/AssistantMessage",
                         "query_result": "#/components/schemas/QueryResult",
-                        "invalid_call": "#/components/schemas/InvalidCall"
+                        "invalid_call": "#/components/schemas/InvalidCall",
+                        "belief_revision": "#/components/schemas/BeliefRevision"
                       }
                     }
                   },
@@ -164,6 +168,58 @@
           "text"
         ],
         "title": "AssistantMessage"
+      },
+      "BeliefRevision": {
+        "properties": {
+          "drop": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Drop"
+          },
+          "add": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Add"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "kind": {
+            "type": "string",
+            "const": "belief_revision",
+            "title": "Kind",
+            "default": "belief_revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "drop",
+          "add"
+        ],
+        "title": "BeliefRevision",
+        "description": "How the model revised its beliefs after a step. Its beliefs are all revisions so far, applied in order.\n\nEach belief is a statement, numbered when added; numbers are never reused."
       },
       "HTTPValidationError": {
         "properties": {

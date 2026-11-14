@@ -25,14 +25,20 @@ class ModelConfig(BaseModel):
     base_url: str
     api_key: str
     name: str
-    # Query results the model sees in full: the most recent ones. Older results are sent
-    # as "Omitted.", so long sessions fit the model's context; it can run their queries again.
-    recent_results: int = 20
-    # Model requests per user message. The last one must answer without querying.
-    max_steps: int = 100
     # Sent as the request's reasoning_effort, such as "medium". Unset, it isn't sent:
     # some endpoints reject it, and the model keeps its own default.
     reasoning_effort: ReasoningEffort = None
+
+
+class HarnessConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Model requests per user message. The last one must answer without querying.
+    max_steps: int = 100
+    # Beliefs the model is asked to keep at most.
+    max_beliefs: int = 50
+    # Steps the model sees besides its beliefs: its short-term memory. It revises its beliefs every this many steps.
+    recent_steps: int = 10
 
 
 class EffectsConfig(BaseModel):
@@ -47,6 +53,7 @@ class Config(BaseModel):
 
     database: DatabaseConfig
     model: ModelConfig
+    harness: HarnessConfig = HarnessConfig()  # every setting has a default
     effects: EffectsConfig
     # A file to keep the conversation in across restarts. Without it, history is kept only in memory.
     history: Path | None = None

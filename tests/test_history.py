@@ -8,6 +8,7 @@ from pydantic import TypeAdapter
 from fakes import RAW_RESULT
 from glint.history import (
     AssistantMessage,
+    BeliefRevision,
     Entry,
     History,
     InvalidCall,
@@ -16,7 +17,6 @@ from glint.history import (
     UserMessage,
     from_api,
     to_api,
-    to_api_messages,
 )
 from glint.serialize import Result
 from glint.tool import QueryRun
@@ -62,34 +62,19 @@ def test_invalid_call():
     }
 
 
-def query_result(call_id, error=None):
-    result = None if error else Result.from_raw(RAW_RESULT)
-    return QueryResult(call_id, QueryRun(description="d", sql="SELECT 1", spec=None, at=AT, result=result, error=error))
-
-
-@pytest.mark.parametrize(
-    ("recent", "omitted"),
-    [
-        (0, ["call_1", "call_3", "call_4"]),
-        (2, ["call_1"]),
-        (5, []),
-    ],
-)
-def test_to_api_messages_omits_older_results(recent, omitted):
-    # Errors are always sent, and don't count toward the recent results.
-    entries = [UserMessage("hi"), query_result("call_1"), query_result("call_2", "e"), query_result("call_3"), query_result("call_4")]
-    messages = to_api_messages(entries, recent)
-    assert len(messages) == len(entries)
-    assert [m["tool_call_id"] for m in messages if m["content"] == "Omitted."] == omitted
-
-
 def test_history_json():
     # What the page receives: each entry tagged with its kind, and back again.
     run = QueryRun(description="d", sql="SELECT 1", spec=None, at=AT, result=Result.from_raw(RAW_RESULT), error=None)
-    history = [UserMessage("hi"), AssistantMessage(None, (CALL,)), QueryResult("call_1", run), InvalidCall("call_2", "e")]
+    history = [
+        UserMessage("hi"),
+        AssistantMessage(None, (CALL,)),
+        QueryResult("call_1", run),
+        InvalidCall("call_2", "e"),
+        BeliefRevision({1: "The user is here."}, {2: "The user greeted me."}),
+    ]
     adapter = TypeAdapter(list[Entry])
     data = json.loads(adapter.dump_json(history))
-    assert [e["kind"] for e in data] == ["user", "assistant", "query_result", "invalid_call"]
+    assert [e["kind"] for e in data] == ["user", "assistant", "query_result", "invalid_call", "belief_revision"]
     assert adapter.validate_python(data) == history
 
 

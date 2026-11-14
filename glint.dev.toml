@@ -11,9 +11,12 @@ connection = "postgresql://postgres:postgres@127.0.0.1:15432/pagila"
 base_url = "http://localhost:11434/v1"  # Ollama's OpenAI-compatible endpoint
 api_key = "ollama"  # ignored by Ollama, but the client needs a value
 name = "qwen3:0.6b"
-recent_results = 20
-max_steps = 100
 reasoning_effort = "medium"
+
+[harness]
+max_steps = 100
+max_beliefs = 50
+recent_steps = 10
 
 [effects]
 allow = ["reads_data", "reads_catalog", "reads_session_settings", "reads_clock", "reads_random_source"]

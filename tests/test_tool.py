@@ -3,7 +3,16 @@ import pytest
 from fakes import RAW_RESULT, FakeEngine
 from glint.engine import QueryError
 from glint.serialize import Result
-from glint.tool import QUERY_TOOL, InvalidToolCall, QueryArgs, parse_arguments, run_query
+from glint.tool import (
+    QUERY_TOOL,
+    REVISE_BELIEFS_TOOL,
+    InvalidToolCall,
+    QueryArgs,
+    ReviseBeliefsArgs,
+    parse_arguments,
+    parse_revise_beliefs_arguments,
+    run_query,
+)
 
 
 def test_run_query():
@@ -78,3 +87,37 @@ def test_parse_arguments_invalid(arguments):
     # The message is pydantic's, so only the exception is checked.
     with pytest.raises(InvalidToolCall):
         parse_arguments("query", arguments)
+
+
+def test_revise_beliefs_tool_matches_args():
+    # REVISE_BELIEFS_TOOL is written for the model and ReviseBeliefsArgs parses its calls.
+    parameters = REVISE_BELIEFS_TOOL["function"]["parameters"]
+    assert list(parameters["properties"]) == list(ReviseBeliefsArgs.model_fields)
+    assert parameters["required"] == [n for n, f in ReviseBeliefsArgs.model_fields.items() if f.is_required()]
+
+
+def test_parse_revise_beliefs_arguments():
+    arguments = '{"drop": [3], "add": ["101 recipes are tagged low-sodium."]}'
+    assert parse_revise_beliefs_arguments("revise_beliefs", arguments) == ReviseBeliefsArgs(
+        drop=[3], add=["101 recipes are tagged low-sodium."]
+    )
+
+
+def test_parse_revise_beliefs_arguments_unknown_tool():
+    with pytest.raises(InvalidToolCall) as e:
+        parse_revise_beliefs_arguments("query", '{"drop": [], "add": []}')
+    assert str(e.value) == "Unknown tool: query."
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        '{"drop": []}',
+        '{"drop": [], "add": "One statement."}',  # not a list
+        '{"drop": ["1"], "add": []}',  # not a number
+        '{"drop": [], "add": [], "keep": []}',  # not in the schema
+    ],
+)
+def test_parse_revise_beliefs_arguments_invalid(arguments):
+    with pytest.raises(InvalidToolCall):
+        parse_revise_beliefs_arguments("revise_beliefs", arguments)

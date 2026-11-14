@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from glint.agent import Session
 from glint.config import load_config
-from glint.history import AssistantMessage, History, InvalidCall, QueryResult
+from glint.history import AssistantMessage, BeliefRevision, History, InvalidCall, QueryResult
 from glint.postgres.engine import PostgresEngine
 from glint.server import STATIC, create_app
 
@@ -70,9 +70,10 @@ def main() -> None:
 
     engine = PostgresEngine(conn, config.effects.allow, MAX_ROWS, TIMEOUT)
     model = args.model or config.model.name
-    max_steps = args.max_steps if args.max_steps is not None else config.model.max_steps
+    max_steps = args.max_steps if args.max_steps is not None else config.harness.max_steps
     reasoning_effort = args.reasoning_effort or config.model.reasoning_effort
-    session = Session(client, model, engine, history, config.model.recent_results, max_steps, reasoning_effort)
+    harness = config.harness
+    session = Session(client, model, engine, history, max_steps, harness.max_beliefs, harness.recent_steps, reasoning_effort)
     if headless:
         run_headless(session, args.prompt)
     else:
@@ -122,6 +123,11 @@ def run_headless(session: Session, prompt: str) -> None:
                     calls += 1
                     failed += 1
                     print(f"[{calls}] invalid: {error}", flush=True)
+                case BeliefRevision(drop=drop, add=add, usage=usage):
+                    print(f"Revised beliefs: -{len(drop)} +{len(add)}", flush=True)
+                    if usage:
+                        prompt_tokens += usage.prompt_tokens
+                        completion_tokens += usage.completion_tokens
     except KeyboardInterrupt:
         print("Interrupted.", flush=True)
     print(f"Tool calls: {calls}, {failed} failed. Tokens: {prompt_tokens:,} prompt, {completion_tokens:,} completion.")
