@@ -24,6 +24,7 @@ Revising them:
 - Answer when your beliefs say you have what the request needs.
 - Each belief is one proposition, standing on its own.
 - Add only what you don't already believe. Never restate a belief in other words; to sharpen one, drop it and add the sharper statement.
+- Don't drop a belief only to add it back unchanged; leave it.
 - Drop the ones the evidence contradicts, and the ones that no longer matter. To correct one, drop it and add the corrected statement.
 - If the evidence changes nothing, revise with nothing to drop or add.
 - Keep at most {max_beliefs}.
