@@ -6,7 +6,13 @@
 
 Glint lets you explore PostgreSQL databases using natural language. A language model investigates your data through SQL and presents its findings as tables and charts. Each step shows the SQL it ran and the results it received.
 
-Glint takes a deliberately restrictive approach to building agents. Rather than assuming an agent should have access to tools, resources, and context, we start by giving it nothing and add only what its task requires. In Glint, the database is the agent's only external resource. It has no other tools, no files, and no access to its full conversation history. Its memory is limited to a small window of recent steps and a set of beliefs summarizing what it has learned.
+Glint is built around a simple principle: an agent should have access only to what it needs, and retain only what matters. This principle shapes two aspects of its design: what the agent can access and what it remembers.
+
+First, Glint takes a deliberately minimal approach to access. Rather than giving the agent a broad set of tools, resources, and context by default, we start with nothing and introduce only what the task requires. In Glint, the database is the agent's only external resource. It has no other tools, no files, and no access to its full conversation history.
+
+Second, Glint takes a selective approach to memory. Human memory offers a useful analogy: unless we're deliberately trying to memorize something, we rarely remember the exact words spoken in a conversation. Instead, we retain what we understood from it. We build an understanding through experience, preserving what matters and revising it as we learn more. Glint follows a similar approach. Rather than retaining every detail of its interactions, it maintains an evolving understanding of the data—a set of beliefs that it updates as it investigates.
+
+The agent's working context is intentionally limited, too: it can see only a small window of recent steps alongside these accumulated beliefs. This keeps its immediate context focused on the current task while allowing its understanding to develop over time.
 
 ## Safety
 
