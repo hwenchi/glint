@@ -58,7 +58,7 @@ def test_respond_without_tool_calls():
     [request] = endpoint.requests
     assert request["model"] == "fake-model"
     assert request["messages"] == [
-        {"role": "system", "content": system_prompt(100, 50, 10)},
+        {"role": "system", "content": system_prompt(100, 200, 10)},
         {"role": "user", "content": beliefs_message({})},
         {"role": "user", "content": "How many G films?"},
     ]

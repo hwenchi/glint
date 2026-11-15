@@ -54,7 +54,7 @@ class Session:
         engine: Engine,
         history: History,
         max_steps: int = 100,
-        max_beliefs: int = 50,
+        max_beliefs: int = 200,
         max_observations: int = 10,
         reasoning_effort: ReasoningEffort = None,
     ):

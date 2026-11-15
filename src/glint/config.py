@@ -36,7 +36,7 @@ class HarnessConfig(BaseModel):
     # Model requests per user message. The last one must answer without querying.
     max_steps: int = 100
     # Beliefs the model is asked to keep at most.
-    max_beliefs: int = 50
+    max_beliefs: int = 200
     # Observations the model remembers at most: its short-term memory. It revises its beliefs every this many.
     max_observations: int = 10
 
