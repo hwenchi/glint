@@ -1,10 +1,9 @@
 import threading
-from datetime import UTC, datetime
 
 import pytest
 
 from fakes import RAW_RESULT, FakeEndpoint, FakeEngine
-from glint.agent import Session, context_message, run_tool_call, skip_tool_call
+from glint.agent import Session, beliefs_message, run_tool_call, skip_tool_call
 from glint.prompt import LAST_STEP_NOTE, system_prompt
 from glint.history import (
     AssistantMessage,
@@ -15,11 +14,11 @@ from glint.history import (
     ToolCall,
     Usage,
     UserMessage,
+    to_api,
 )
 from glint.serialize import Result
-from glint.tool import QUERY_TOOL, REVISE_BELIEFS_TOOL, QueryRun
+from glint.tool import QUERY_TOOL, REVISE_BELIEFS_TOOL
 
-AT = datetime(2026, 11, 1, tzinfo=UTC)
 CALL = ToolCall("call_1", "query", '{"description": "Films per rating", "sql": "SELECT 1"}')
 ANSWER = AssistantMessage("There are 178 G-rated films.", model="fake-model")
 CALL_REPLY = AssistantMessage(None, (CALL,), model="fake-model")
@@ -34,11 +33,15 @@ def revise(arguments: str) -> AssistantMessage:
 NOTED = revise('{"drop": [], "add": []}')
 
 
-def context(request) -> str:
-    """The request's message to the model: its beliefs and its last few steps."""
-    [system, user] = request["messages"]
-    assert system["role"] == "system"
-    return user["content"]
+def sent(request) -> list:
+    """What the request sent after the system prompt."""
+    assert request["messages"][0]["role"] == "system"
+    return request["messages"][1:]
+
+
+def context(request, beliefs, *entries) -> list:
+    """The turn's request, the beliefs, then the last few steps as they happened."""
+    return [to_api(request), {"role": "user", "content": beliefs_message(beliefs)}, *map(to_api, entries)]
 
 
 def test_respond_without_tool_calls():
@@ -51,7 +54,8 @@ def test_respond_without_tool_calls():
     assert request["model"] == "fake-model"
     assert request["messages"] == [
         {"role": "system", "content": system_prompt(100, 50, 10)},
-        {"role": "user", "content": context_message({}, [UserMessage("How many G films?")])},
+        {"role": "user", "content": "How many G films?"},
+        {"role": "user", "content": beliefs_message({})},
     ]
     assert request["tools"] == [QUERY_TOOL]
     assert "tool_choice" not in request
@@ -80,7 +84,9 @@ def test_respond_with_tool_call():
     assert [type(e) for e in entries] == [UserMessage, AssistantMessage, QueryResult, AssistantMessage]
     assert entries[2].run.result == Result.from_raw(RAW_RESULT)
     assert engine.queries == ["SELECT 1"]
-    assert context(endpoint.requests[1]) == context_message({}, entries[:3])
+    # The call and its result are sent as they happened, and nothing the model shouldn't see.
+    assert sent(endpoint.requests[1]) == context(entries[0], {}, *entries[1:3])
+    assert sent(endpoint.requests[1])[-1].keys() == {"role", "tool_call_id", "content"}
 
 
 def test_respond_revises_every_recent_steps():
@@ -97,9 +103,9 @@ def test_respond_revises_every_recent_steps():
     # After two steps, the model must revise, seeing both.
     assert revising["tools"] == [REVISE_BELIEFS_TOOL]
     assert revising["tool_choice"] == "required"
-    assert context(revising) == context_message({}, entries[:3])
+    assert sent(revising) == context(entries[0], {}, *entries[1:3])
     # Revising doesn't clear what the model sees.
-    assert context(answer) == context_message(belief, entries[:3])
+    assert sent(answer) == context(entries[0], belief, *entries[1:3])
 
 
 def test_respond_forgets_the_oldest_step():
@@ -107,8 +113,8 @@ def test_respond_forgets_the_oldest_step():
     session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), recent_steps=2)
     entries = list(session.respond("How many G films?"))
     user, first_reply, first_result, revision, second_reply, second_result, answer = entries
-    # Two steps in view: the user's message has left.
-    assert context(endpoint.requests[-1]) == context_message({}, [first_reply, first_result, second_reply, second_result])
+    # Two steps in view: the user's message has left them, but the turn's request is always sent.
+    assert sent(endpoint.requests[-1]) == context(user, {}, first_reply, first_result, second_reply, second_result)
 
 
 def test_respond_records_what_dropped_beliefs_said():
@@ -128,19 +134,29 @@ def test_respond_records_what_dropped_beliefs_said():
         '{"drop": [1], "add": []}',  # not held
     ],
 )
-def test_respond_stops_on_an_invalid_revision(arguments):
-    session = Session(FakeEndpoint(revise(arguments)).client(), "fake-model", FakeEngine(), History(), recent_steps=1)
+def test_respond_retries_an_invalid_revision(arguments):
+    invalid = revise(arguments)
+    endpoint = FakeEndpoint(invalid, NOTED, ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), recent_steps=1)
     entries = list(session.respond("How many G films?"))
-    assert len(entries) == 2
-    assert entries[1].text.startswith("Stopped: the model's revision of its beliefs was invalid.")
-    assert session.beliefs.current == {}
+    user, reply, error, revision, answer = entries
+    assert reply == invalid
+    assert error.tool_call_id == "call_0"
+    assert error.error.startswith("Not applied: ")
+    assert revision == BeliefRevision({}, {}, Usage(50, 5), "fake-model")
+    # The retry sees the failed call and its error, and must revise again.
+    retry = endpoint.requests[1]
+    assert sent(retry) == context(user, {}, reply, error)
+    assert retry["tools"] == [REVISE_BELIEFS_TOOL]
 
 
-def test_respond_stops_without_a_revision():
+def test_respond_retries_without_a_revision():
     # A model that answers when it must revise, though the request requires a call.
-    session = Session(FakeEndpoint(ANSWER).client(), "fake-model", FakeEngine(), History(), recent_steps=1)
+    endpoint = FakeEndpoint(ANSWER, NOTED, ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), recent_steps=1)
     entries = list(session.respond("How many G films?"))
-    assert entries == [UserMessage("How many G films?"), AssistantMessage("Stopped: the model didn't revise its beliefs.")]
+    assert [type(e) for e in entries] == [UserMessage, AssistantMessage, BeliefRevision, AssistantMessage]
+    assert endpoint.requests[1]["tools"] == [REVISE_BELIEFS_TOOL]
 
 
 def test_respond_continues_saved_history(tmp_path):
@@ -153,18 +169,18 @@ def test_respond_continues_saved_history(tmp_path):
     list(second.respond("How many G films?"))
     # The beliefs, the recent steps and the count since the last revision come back from the saved history.
     assert endpoint.requests[0]["tools"] == [REVISE_BELIEFS_TOOL]
-    assert context(endpoint.requests[0]) == context_message({1: "The user likes films."}, [ANSWER, UserMessage("How many G films?")])
+    assert sent(endpoint.requests[0]) == context(UserMessage("How many G films?"), {1: "The user likes films."}, ANSWER)
 
 
-def test_stopping_early_keeps_what_was_recorded():
-    # As when the browser disconnects: the caller stops right after the reply.
+def test_stopping_early_leaves_valid_history():
+    # As when the browser disconnects: the caller stops right after the tool call.
     endpoint = FakeEndpoint(CALL_REPLY, ANSWER)
     session = Session(endpoint.client(), "fake-model", FakeEngine(), History())
     turn = session.respond("How many G films?")
     assert next(turn) == UserMessage("How many G films?")
     assert next(turn) == CALL_REPLY
     turn.close()
-    assert list(session.history) == [UserMessage("How many G films?"), CALL_REPLY]
+    assert [type(e) for e in session.history] == [UserMessage, AssistantMessage, QueryResult]
 
 
 def test_turns_wait_for_each_other():
@@ -197,7 +213,9 @@ def test_respond_stops_after_max_steps():
     session = Session(endpoint.client(), "fake-model", engine, History(), max_steps=3)
     entries = list(session.respond("loop"))
     assert ["tools" in r for r in endpoint.requests] == [True, True, False]
-    assert [context(r).endswith(LAST_STEP_NOTE) for r in endpoint.requests] == [False, False, True]
+    note = {"role": "user", "content": LAST_STEP_NOTE}
+    assert [r["messages"][-1] == note for r in endpoint.requests] == [False, False, True]
+    assert UserMessage(LAST_STEP_NOTE) not in session.history
     assert len(engine.queries) == 2  # the last step's call is skipped
     assert entries[-2].run.error == "Canceled."
     assert entries[-1] == AssistantMessage("Stopped after 3 steps without an answer.")
@@ -240,44 +258,17 @@ def test_interrupt_between_turns_is_ignored():
     assert list(session.respond("How many G films?"))[-1] == ANSWER
 
 
-def test_context_message():
-    result = Result.from_raw(RAW_RESULT)
-    recent = [
-        AssistantMessage("Let me count them.", (CALL, CALL)),
-        QueryResult("call_1", QueryRun(description="Films by rating", sql="SELECT 1", spec=None, at=AT, result=result, error=None)),
-        QueryResult("call_2", QueryRun(description="Nope", sql="SELECT nope", spec=None, at=AT, result=None, error="no column")),
-        InvalidCall("call_3", "Unknown tool: execute."),
-    ]
-    assert context_message({1: "The user likes films.", 3: "Films have ratings."}, recent) == """\
-Here is what you believe about the world:
+def test_beliefs_message():
+    assert beliefs_message({1: "The user likes films.", 3: "Films have ratings."}) == """\
+Glint: Here is what you believe about the world:
 1. The user likes films.
-3. Films have ratings.
-
-And what happened recently:
-
-You replied:
-Let me count them.
-
-You ran a query: Films by rating
-SELECT 1
-Result: {"columns":["rating","n"],"rows":[["G",178]]}
-
-You ran a query: Nope
-SELECT nope
-Error: no column
-
-Your query couldn't be run: Unknown tool: execute."""
+3. Films have ratings."""
 
 
-def test_context_message_without_beliefs():
-    assert context_message({}, [UserMessage("hi")]) == """\
-Here is what you believe about the world:
-Nothing yet.
-
-And what happened recently:
-
-The user wrote:
-hi"""
+def test_beliefs_message_without_beliefs():
+    assert beliefs_message({}) == """\
+Glint: Here is what you believe about the world:
+Nothing yet."""
 
 
 def test_skip_tool_call_malformed():

@@ -20,6 +20,7 @@ from glint.history import (
     ToolCall,
     UserMessage,
     from_api,
+    to_api,
 )
 from glint.prompt import LAST_STEP_NOTE, system_prompt
 from glint.tool import (
@@ -100,9 +101,11 @@ class Session:
     def _revise_beliefs(self, reply: AssistantMessage) -> BeliefRevision:
         """Apply the reply's calls to revise_beliefs, as one revision, and return it.
 
-        Raises InvalidToolCall if a call's arguments don't fit the tool, and ValueError
+        Raises InvalidToolCall if the reply has no call or a call's arguments don't fit the tool, and ValueError
         if it drops a belief the model doesn't hold. Either way, nothing changes.
         """
+        if not reply.tool_calls:
+            raise InvalidToolCall("Revise your beliefs with revise_beliefs.")
         drop: dict[int, str] = {}
         add: dict[int, str] = {}
         number = self.beliefs.next_number
@@ -141,9 +144,13 @@ class Session:
                 # The last step must answer, so its request offers no tool.
                 last = step == self.max_steps - 1
                 revising = self._since_revision >= self.recent_steps and not last
-                context = context_message(self.beliefs.current, [entry for step in self._recent for entry in step])
+                # The turn's request comes first, for the whole turn, then the beliefs and the last few steps.
+                recent = [to_api(entry) for step in self._recent for entry in step if entry is not user_message]
+                beliefs = {"role": "user", "content": beliefs_message(self.beliefs.current)}
+                messages = [self.system_message, to_api(user_message), beliefs, *recent]
                 if last:
-                    context += "\n\n" + LAST_STEP_NOTE
+                    # Not in the history: like the system prompt, it's Glint's, not the conversation's.
+                    messages.append({"role": "user", "content": LAST_STEP_NOTE})
                     tools, tool_choice = NOT_GIVEN, NOT_GIVEN
                 elif revising:
                     tools, tool_choice = [REVISE_BELIEFS_TOOL], "required"
@@ -151,31 +158,26 @@ class Session:
                     tools, tool_choice = [QUERY_TOOL], NOT_GIVEN
                 response = self.client.chat.completions.create(
                     model=self.model,
-                    messages=[self.system_message, {"role": "user", "content": context}],
+                    messages=messages,
                     tools=tools,
                     tool_choice=tool_choice,
                     reasoning_effort=self.reasoning_effort or NOT_GIVEN,
                 )
                 reply = from_api(response.choices[0].message, self.model, response.usage)
                 if revising:
-                    # The reply is recorded as the revision it makes, not as a step.
-                    if not reply.tool_calls:
-                        failed = AssistantMessage("Stopped: the model didn't revise its beliefs.")
-                        self._record(failed)
-                        yield failed
-                        return
                     try:
                         revision = self._revise_beliefs(reply)
                     except (InvalidToolCall, ValueError) as e:
-                        failed = AssistantMessage(f"Stopped: the model's revision of its beliefs was invalid. {e}")
-                        self._record(failed)
-                        yield failed
-                        return
+                        # A step the model sees, with an error for each call. The next step must revise again.
+                        errors = [InvalidCall(call.id, f"Not applied: {e}") for call in reply.tool_calls]
+                        self._record(reply, *errors)
+                        yield reply
+                        yield from errors
+                        continue
+                    # A valid revision is recorded as itself, not as a step.
                     self._record(revision)
                     yield revision
                 else:
-                    self._record(reply)
-                    yield reply
                     results = []
                     for call in reply.tool_calls:
                         # A model may call a tool even when none is offered; on the last step, such calls are skipped.
@@ -183,7 +185,9 @@ class Session:
                             results.append(skip_tool_call(call))
                         else:
                             results.append(run_tool_call(self.engine, call))
-                    self._record(*results)
+                    # Together: the model is sent past steps as they happened, and a call needs its result.
+                    self._record(reply, *results)
+                    yield reply
                     yield from results
                     if not reply.tool_calls:
                         return
@@ -192,28 +196,10 @@ class Session:
             yield stop_message
 
 
-def context_message(beliefs: Mapping[int, str], recent: Sequence[Entry]) -> str:
-    """Glint's message to the model, in place of the conversation: its beliefs, numbered, and its last few steps."""
+def beliefs_message(beliefs: Mapping[int, str]) -> str:
+    """Glint's message giving the model its beliefs, numbered. Its last few steps follow it as they happened."""
     beliefs_text = "\n".join(f"{number}. {statement}" for number, statement in beliefs.items()) or "Nothing yet."
-    recent_text = "\n\n".join(describe(entry) for entry in recent)
-    return f"Here is what you believe about the world:\n{beliefs_text}\n\nAnd what happened recently:\n\n{recent_text}"
-
-
-def describe(entry: Entry) -> str:
-    """An entry as plain text, as evidence for revising beliefs."""
-    match entry:
-        case UserMessage(text):
-            return f"The user wrote:\n{text}"
-        case AssistantMessage(text) if text:
-            return f"You replied:\n{text}"
-        case AssistantMessage():
-            return "You replied by running queries."
-        case QueryResult(_, run) if run.result is not None:
-            return f"You ran a query: {run.description}\n{run.sql}\nResult: {run.result.model_dump_json()}"
-        case QueryResult(_, run):
-            return f"You ran a query: {run.description}\n{run.sql}\nError: {run.error}"
-        case InvalidCall(_, error):
-            return f"Your query couldn't be run: {error}"
+    return f"Glint: Here is what you believe about the world:\n{beliefs_text}"
 
 
 def run_tool_call(engine: Engine, call: ToolCall) -> QueryResult | InvalidCall:
