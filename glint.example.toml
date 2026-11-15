@@ -18,10 +18,11 @@ name = "qwen3.6-35b-a3b"
 [harness]
 # Model requests per user message. The last one must answer without querying.
 # max_steps = 100
-# Beliefs the model is asked to keep at most. It sees its beliefs instead of the conversation.
+# Beliefs the model is asked to keep at most.
 # max_beliefs = 50
-# Steps the model sees besides its beliefs. It revises its beliefs every this many steps.
-# recent_steps = 10
+# Observations the model remembers at most: its replies that queried, with their results. It revises its beliefs
+# every this many.
+# max_observations = 10
 
 [effects]
 # The effects a query may have. A query with any other effect is rejected.

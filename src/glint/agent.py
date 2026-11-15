@@ -3,6 +3,7 @@
 import threading
 from collections import deque
 from collections.abc import Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from openai import NOT_GIVEN, OpenAI
@@ -20,6 +21,7 @@ from glint.history import (
     ToolCall,
     UserMessage,
     from_api,
+    in_conversation,
     to_api,
 )
 from glint.prompt import LAST_STEP_NOTE, system_prompt
@@ -34,6 +36,14 @@ from glint.tool import (
 )
 
 
+@dataclass
+class Observation:
+    """Where an observation is in the history: a reply with tool calls and their results."""
+
+    start: int  # the reply's index
+    end: int  # the index after its last result
+
+
 class Session:
     """The one conversation of this Glint process. Only respond adds to its history."""
 
@@ -45,7 +55,7 @@ class Session:
         history: History,
         max_steps: int = 100,
         max_beliefs: int = 50,
-        recent_steps: int = 10,
+        max_observations: int = 10,
         reasoning_effort: ReasoningEffort = None,
     ):
         self.client = client
@@ -53,16 +63,16 @@ class Session:
         self.engine = engine
         self._history = history
         self.beliefs = Beliefs(history.entries)
-        # Short-term memory: the last few steps, oldest first. The oldest leaves as a new one comes in.
-        self._recent: deque[list[Entry]] = deque(maxlen=recent_steps)
-        # Steps since the beliefs were last revised. At recent_steps, they're revised.
-        self._since_revision = 0
-        for entry in history.entries:
-            self._remember(entry)
-        self.recent_steps = recent_steps
+        self.max_observations = max_observations
+        # Short-term memory: the last few observations, oldest first.
+        self._recent_observations: deque[Observation] = deque()
+        # Observations since the beliefs were last revised. At max_observations, they're revised.
+        self._new_observations = 0
+        for index, entry in enumerate(history.entries):
+            self._remember(index, entry)
         self.max_steps = max_steps  # model requests per user message
         self.reasoning_effort = reasoning_effort  # sent only when set
-        self.system_message = {"role": "system", "content": system_prompt(max_steps, max_beliefs, recent_steps)}
+        self.system_message = {"role": "system", "content": system_prompt(max_steps, max_beliefs, max_observations)}
         # A plain Lock, not an RLock: a turn's steps may run on different threads,
         # so it can be released by a thread other than the one that acquired it.
         self._turn = threading.Lock()
@@ -83,20 +93,38 @@ class Session:
 
     def _record(self, *entries: Entry) -> None:
         """Add the entries to the history and to short-term memory."""
+        start = len(self._history.entries)
         self._history.extend(*entries)
-        for entry in entries:
-            self._remember(entry)
+        for index, entry in enumerate(entries, start):
+            self._remember(index, entry)
 
-    def _remember(self, entry: Entry) -> None:
-        """Add the entry to short-term memory: a user's message or a reply starts a step, and a result joins its reply's."""
+    def _remember(self, index: int, entry: Entry) -> None:
+        """Add the history entry at index to short-term memory: a reply with tool calls starts an observation, and
+        each result joins it."""
         match entry:
-            case UserMessage() | AssistantMessage():
-                self._recent.append([entry])
-                self._since_revision += 1
+            case AssistantMessage(tool_calls=calls) if calls:
+                self._recent_observations.append(Observation(index, index + 1))
+                self._new_observations += 1
+                # Short-term memory must keep:
+                # - the last max_observations;
+                # - every new observation, which the beliefs haven't taken in yet.
+                # All older observations are forgotten.
+                keep = max(self.max_observations, self._new_observations)
+                while len(self._recent_observations) > keep:
+                    self._recent_observations.popleft()
             case QueryResult() | InvalidCall():
-                self._recent[-1].append(entry)
+                self._recent_observations[-1].end = index + 1
             case BeliefRevision():
-                self._since_revision = 0
+                self._new_observations = 0
+
+    def _memory(self) -> list[dict]:
+        """The conversation and the recent observations, in the order they happened, as API messages."""
+        observed = {index for observation in self._recent_observations for index in range(observation.start, observation.end)}
+        return [
+            to_api(entry)
+            for index, entry in enumerate(self._history.entries)
+            if in_conversation(entry) or index in observed
+        ]
 
     def _revise_beliefs(self, reply: AssistantMessage) -> BeliefRevision:
         """Apply the reply's calls to revise_beliefs, as one revision, and return it.
@@ -123,9 +151,9 @@ class Session:
     def respond(self, text: str) -> Iterator[Entry]:
         """Answer the user's message.
 
-        Each step, the model sees its beliefs and its last few steps, and:
-        - every recent_steps steps, revises its beliefs, taking in what it sees;
-        - otherwise queries, gathering evidence, or answers the user, which ends the turn.
+        Each step, the model sees its beliefs, the conversation, and its recent observations, and:
+        - every max_observations observations, revises its beliefs;
+        - otherwise queries, or answers the user, which ends the turn.
 
         Each new entry is added to the history and yielded, so it can be shown as it arrives.
         Turns don't overlap: a second one waits until the first has ended.
@@ -137,17 +165,15 @@ class Session:
             yield user_message
             for step in range(self.max_steps):
                 if self._interrupted.is_set():
-                    interrupted = AssistantMessage("Interrupted.")
+                    interrupted = AssistantMessage("Interrupted.", final=True)
                     self._record(interrupted)
                     yield interrupted
                     return
                 # The last step must answer, so its request offers no tool.
                 last = step == self.max_steps - 1
-                revising = self._since_revision >= self.recent_steps and not last
-                # The turn's request comes first, for the whole turn, then the beliefs and the last few steps.
-                recent = [to_api(entry) for step in self._recent for entry in step if entry is not user_message]
+                revising = self._new_observations >= self.max_observations and not last
                 beliefs = {"role": "user", "content": beliefs_message(self.beliefs.current)}
-                messages = [self.system_message, to_api(user_message), beliefs, *recent]
+                messages = [self.system_message, beliefs, *self._memory()]
                 if last:
                     # Not in the history: like the system prompt, it's Glint's, not the conversation's.
                     messages.append({"role": "user", "content": LAST_STEP_NOTE})
@@ -163,18 +189,21 @@ class Session:
                     tool_choice=tool_choice,
                     reasoning_effort=self.reasoning_effort or NOT_GIVEN,
                 )
-                reply = from_api(response.choices[0].message, self.model, response.usage)
+                message = response.choices[0].message
+                # An answer: no tool calls on a step that isn't a revision. It ends the turn.
+                final = not revising and not message.tool_calls
+                reply = from_api(message, self.model, response.usage, final)
                 if revising:
                     try:
                         revision = self._revise_beliefs(reply)
                     except (InvalidToolCall, ValueError) as e:
-                        # A step the model sees, with an error for each call. The next step must revise again.
+                        # An observation, with an error for each call. The next step must revise again.
                         errors = [InvalidCall(call.id, f"Not applied: {e}") for call in reply.tool_calls]
                         self._record(reply, *errors)
                         yield reply
                         yield from errors
                         continue
-                    # A valid revision is recorded as itself, not as a step.
+                    # A valid revision is recorded as itself, not as an observation.
                     self._record(revision)
                     yield revision
                 else:
@@ -185,19 +214,19 @@ class Session:
                             results.append(skip_tool_call(call))
                         else:
                             results.append(run_tool_call(self.engine, call))
-                    # Together: the model is sent past steps as they happened, and a call needs its result.
+                    # Together: a call needs its result.
                     self._record(reply, *results)
                     yield reply
                     yield from results
-                    if not reply.tool_calls:
+                    if reply.final:
                         return
-            stop_message = AssistantMessage(f"Stopped after {self.max_steps} steps without an answer.")
+            stop_message = AssistantMessage(f"Stopped after {self.max_steps} steps without an answer.", final=True)
             self._record(stop_message)
             yield stop_message
 
 
 def beliefs_message(beliefs: Mapping[int, str]) -> str:
-    """Glint's message giving the model its beliefs, numbered. Its last few steps follow it as they happened."""
+    """Glint's message giving the model its beliefs, numbered."""
     beliefs_text = "\n".join(f"{number}. {statement}" for number, statement in beliefs.items()) or "Nothing yet."
     return f"Glint: Here is what you believe about the world:\n{beliefs_text}"
 

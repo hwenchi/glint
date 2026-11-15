@@ -37,8 +37,8 @@ class HarnessConfig(BaseModel):
     max_steps: int = 100
     # Beliefs the model is asked to keep at most.
     max_beliefs: int = 50
-    # Steps the model sees besides its beliefs: its short-term memory. It revises its beliefs every this many steps.
-    recent_steps: int = 10
+    # Observations the model remembers at most: its short-term memory. It revises its beliefs every this many.
+    max_observations: int = 10
 
 
 class EffectsConfig(BaseModel):

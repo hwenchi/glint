@@ -156,6 +156,11 @@
             ],
             "title": "Reasoning"
           },
+          "final": {
+            "type": "boolean",
+            "title": "Final",
+            "default": false
+          },
           "kind": {
             "type": "string",
             "const": "assistant",

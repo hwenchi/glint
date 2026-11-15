@@ -64,6 +64,11 @@ export interface components {
             /** Reasoning */
             reasoning?: string | null;
             /**
+             * Final
+             * @default false
+             */
+            final: boolean;
+            /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */

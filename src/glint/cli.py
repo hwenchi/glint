@@ -73,7 +73,7 @@ def main() -> None:
     max_steps = args.max_steps if args.max_steps is not None else config.harness.max_steps
     reasoning_effort = args.reasoning_effort or config.model.reasoning_effort
     harness = config.harness
-    session = Session(client, model, engine, history, max_steps, harness.max_beliefs, harness.recent_steps, reasoning_effort)
+    session = Session(client, model, engine, history, max_steps, harness.max_beliefs, harness.max_observations, reasoning_effort)
     if headless:
         run_headless(session, args.prompt)
     else:

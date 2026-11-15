@@ -47,6 +47,7 @@ class AssistantMessage:
     model: str | None = None  # as Glint asked for it; None for messages Glint writes itself
     # The model's thinking before the reply, for the page. It isn't sent back to the model.
     reasoning: str | None = None
+    final: bool = False  # the answer that ends a turn
     kind: Literal["assistant"] = "assistant"
 
 
@@ -129,6 +130,17 @@ def _load(path: Path) -> list[Entry]:
     return [ENTRY.validate_json(line) for line in data.splitlines()]
 
 
+def in_conversation(entry: Entry) -> bool:
+    """Whether the entry is part of the conversation: a user's message or the answer that ends a turn."""
+    match entry:
+        case UserMessage():
+            return True
+        case AssistantMessage(final=final):
+            return final
+        case _:
+            return False
+
+
 def to_api(entry: Entry) -> dict[str, Any]:
     """The entry as a message for the chat completions API, which is all the model sees."""
     match entry:
@@ -151,8 +163,11 @@ def to_api(entry: Entry) -> dict[str, Any]:
             return {"role": "tool", "tool_call_id": tool_call_id, "content": f"Error: {error}"}
 
 
-def from_api(message: ChatCompletionMessage, model: str, usage: CompletionUsage | None = None) -> AssistantMessage:
-    """The model's reply as an entry, with the model asked for and the tokens its request used if the server reported them."""
+def from_api(
+    message: ChatCompletionMessage, model: str, usage: CompletionUsage | None = None, final: bool = False
+) -> AssistantMessage:
+    """The model's reply as an entry, with the model asked for and the tokens its request used if the server reported them,
+    and whether it ends the turn."""
     tool_calls = []
     for call in message.tool_calls or ():
         match call.type:
@@ -165,4 +180,4 @@ def from_api(message: ChatCompletionMessage, model: str, usage: CompletionUsage 
     # Not part of the API: servers add it as a field of their own, under one of these names.
     extra = message.model_extra or {}
     reasoning = extra.get("reasoning_content") or extra.get("reasoning")
-    return AssistantMessage(message.content, tuple(tool_calls), tokens, model, reasoning)
+    return AssistantMessage(message.content, tuple(tool_calls), tokens, model, reasoning, final)

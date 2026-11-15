@@ -16,7 +16,7 @@ reasoning_effort = "medium"
 [harness]
 max_steps = 100
 max_beliefs = 50
-recent_steps = 10
+max_observations = 10
 
 [effects]
 allow = ["reads_data", "reads_catalog", "reads_session_settings", "reads_clock", "reads_random_source"]

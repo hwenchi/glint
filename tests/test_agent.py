@@ -20,7 +20,7 @@ from glint.serialize import Result
 from glint.tool import QUERY_TOOL, REVISE_BELIEFS_TOOL
 
 CALL = ToolCall("call_1", "query", '{"description": "Films per rating", "sql": "SELECT 1"}')
-ANSWER = AssistantMessage("There are 178 G-rated films.", model="fake-model")
+ANSWER = AssistantMessage("There are 178 G-rated films.", model="fake-model", final=True)
 CALL_REPLY = AssistantMessage(None, (CALL,), model="fake-model")
 
 
@@ -39,9 +39,9 @@ def sent(request) -> list:
     return request["messages"][1:]
 
 
-def context(request, beliefs, *entries) -> list:
-    """The turn's request, the beliefs, then the last few steps as they happened."""
-    return [to_api(request), {"role": "user", "content": beliefs_message(beliefs)}, *map(to_api, entries)]
+def context(beliefs, *entries) -> list:
+    """The beliefs, then the conversation and the recent observations as they happened."""
+    return [{"role": "user", "content": beliefs_message(beliefs)}, *map(to_api, entries)]
 
 
 def test_respond_without_tool_calls():
@@ -54,8 +54,8 @@ def test_respond_without_tool_calls():
     assert request["model"] == "fake-model"
     assert request["messages"] == [
         {"role": "system", "content": system_prompt(100, 50, 10)},
-        {"role": "user", "content": "How many G films?"},
         {"role": "user", "content": beliefs_message({})},
+        {"role": "user", "content": "How many G films?"},
     ]
     assert request["tools"] == [QUERY_TOOL]
     assert "tool_choice" not in request
@@ -71,7 +71,7 @@ def test_respond_sends_reasoning_effort():
 
 
 def test_respond_records_usage():
-    answer = AssistantMessage("There are 178 G-rated films.", usage=Usage(120, 8), model="fake-model")
+    answer = AssistantMessage("There are 178 G-rated films.", usage=Usage(120, 8), model="fake-model", final=True)
     session = Session(FakeEndpoint(answer).client(), "fake-model", FakeEngine(), History())
     assert list(session.respond("How many G films?"))[-1] == answer
 
@@ -85,14 +85,14 @@ def test_respond_with_tool_call():
     assert entries[2].run.result == Result.from_raw(RAW_RESULT)
     assert engine.queries == ["SELECT 1"]
     # The call and its result are sent as they happened, and nothing the model shouldn't see.
-    assert sent(endpoint.requests[1]) == context(entries[0], {}, *entries[1:3])
+    assert sent(endpoint.requests[1]) == context({}, *entries[0:3])
     assert sent(endpoint.requests[1])[-1].keys() == {"role", "tool_call_id", "content"}
 
 
-def test_respond_revises_every_recent_steps():
-    belief = {1: "The user wants G films counted."}
-    endpoint = FakeEndpoint(CALL_REPLY, revise('{"drop": [], "add": ["The user wants G films counted."]}'), ANSWER)
-    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), recent_steps=2)
+def test_respond_revises_every_max_observations():
+    belief = {1: "There are 178 G-rated films."}
+    endpoint = FakeEndpoint(CALL_REPLY, revise('{"drop": [], "add": ["There are 178 G-rated films."]}'), ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), max_observations=1)
     entries = list(session.respond("How many G films?"))
     # The revising reply is recorded as its revision, with its tokens and model.
     assert [type(e) for e in entries] == [UserMessage, AssistantMessage, QueryResult, BeliefRevision, AssistantMessage]
@@ -100,31 +100,32 @@ def test_respond_revises_every_recent_steps():
     assert session.beliefs.current == belief
     act, revising, answer = endpoint.requests
     assert act["tools"] == [QUERY_TOOL]
-    # After two steps, the model must revise, seeing both.
+    # After one observation, the model must revise, seeing it.
     assert revising["tools"] == [REVISE_BELIEFS_TOOL]
     assert revising["tool_choice"] == "required"
-    assert sent(revising) == context(entries[0], {}, *entries[1:3])
+    assert sent(revising) == context({}, *entries[0:3])
     # Revising doesn't clear what the model sees.
-    assert sent(answer) == context(entries[0], belief, *entries[1:3])
+    assert sent(answer) == context(belief, *entries[0:3])
 
 
-def test_respond_forgets_the_oldest_step():
-    endpoint = FakeEndpoint(CALL_REPLY, NOTED, CALL_REPLY, ANSWER)
-    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), recent_steps=2)
+def test_respond_forgets_the_oldest_observation():
+    endpoint = FakeEndpoint(CALL_REPLY, NOTED, CALL_REPLY, NOTED, ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), max_observations=1)
     entries = list(session.respond("How many G films?"))
-    user, first_reply, first_result, revision, second_reply, second_result, answer = entries
-    # Two steps in view: the user's message has left them, but the turn's request is always sent.
-    assert sent(endpoint.requests[-1]) == context(user, {}, first_reply, first_result, second_reply, second_result)
+    user, first_reply, first_result, _, second_reply, second_result, _, answer = entries
+    # The first observation has left; the user's message stays.
+    assert sent(endpoint.requests[-1]) == context({}, user, second_reply, second_result)
 
 
 def test_respond_records_what_dropped_beliefs_said():
     history = History()
-    history.extend(BeliefRevision({}, {1: "Most films are rated G.", 2: "The user likes films."}))
+    history.extend(BeliefRevision({}, {1: "Most films are rated G.", 2: "Films have ratings."}))
     reply = revise('{"drop": [1], "add": ["Few films are rated G."]}')
-    session = Session(FakeEndpoint(reply, ANSWER).client(), "fake-model", FakeEngine(), history, recent_steps=1)
+    endpoint = FakeEndpoint(CALL_REPLY, reply, ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), history, max_observations=1)
     entries = list(session.respond("Check the ratings."))
-    assert entries[1] == BeliefRevision({1: "Most films are rated G."}, {3: "Few films are rated G."}, Usage(50, 5), "fake-model")
-    assert session.beliefs.current == {2: "The user likes films.", 3: "Few films are rated G."}
+    assert entries[3] == BeliefRevision({1: "Most films are rated G."}, {3: "Few films are rated G."}, Usage(50, 5), "fake-model")
+    assert session.beliefs.current == {2: "Films have ratings.", 3: "Few films are rated G."}
 
 
 @pytest.mark.parametrize(
@@ -136,40 +137,45 @@ def test_respond_records_what_dropped_beliefs_said():
 )
 def test_respond_retries_an_invalid_revision(arguments):
     invalid = revise(arguments)
-    endpoint = FakeEndpoint(invalid, NOTED, ANSWER)
-    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), recent_steps=1)
+    endpoint = FakeEndpoint(CALL_REPLY, invalid, NOTED, ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), max_observations=1)
     entries = list(session.respond("How many G films?"))
-    user, reply, error, revision, answer = entries
+    user, call_reply, result, reply, error, revision, answer = entries
     assert reply == invalid
     assert error.tool_call_id == "call_0"
     assert error.error.startswith("Not applied: ")
     assert revision == BeliefRevision({}, {}, Usage(50, 5), "fake-model")
     # The retry sees the failed call and its error, and must revise again.
-    retry = endpoint.requests[1]
-    assert sent(retry) == context(user, {}, reply, error)
+    retry = endpoint.requests[2]
+    assert sent(retry) == context({}, user, call_reply, result, reply, error)
     assert retry["tools"] == [REVISE_BELIEFS_TOOL]
 
 
 def test_respond_retries_without_a_revision():
     # A model that answers when it must revise, though the request requires a call.
-    endpoint = FakeEndpoint(ANSWER, NOTED, ANSWER)
-    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), recent_steps=1)
+    endpoint = FakeEndpoint(CALL_REPLY, ANSWER, NOTED, ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), max_observations=1)
     entries = list(session.respond("How many G films?"))
-    assert [type(e) for e in entries] == [UserMessage, AssistantMessage, BeliefRevision, AssistantMessage]
-    assert endpoint.requests[1]["tools"] == [REVISE_BELIEFS_TOOL]
+    assert [type(e) for e in entries] == [
+        UserMessage, AssistantMessage, QueryResult, AssistantMessage, BeliefRevision, AssistantMessage
+    ]
+    # The failed revision isn't an answer: the turn goes on.
+    assert not entries[3].final
+    assert endpoint.requests[2]["tools"] == [REVISE_BELIEFS_TOOL]
 
 
 def test_respond_continues_saved_history(tmp_path):
     path = tmp_path / "history.jsonl"
-    first_endpoint = FakeEndpoint(revise('{"drop": [], "add": ["The user likes films."]}'), ANSWER)
-    first = Session(first_endpoint.client(), "fake-model", FakeEngine(), History(path), recent_steps=1)
-    list(first.respond("I like films."))
+    first_endpoint = FakeEndpoint(CALL_REPLY, ANSWER)
+    first = Session(first_endpoint.client(), "fake-model", FakeEngine(), History(path), max_observations=2)
+    earlier = list(first.respond("How many G films?"))
     endpoint = FakeEndpoint(NOTED, ANSWER)
-    second = Session(endpoint.client(), "fake-model", FakeEngine(), History(path), recent_steps=2)
-    list(second.respond("How many G films?"))
-    # The beliefs, the recent steps and the count since the last revision come back from the saved history.
+    second = Session(endpoint.client(), "fake-model", FakeEngine(), History(path), max_observations=1)
+    list(second.respond("And PG films?"))
+    # The conversation, the recent observations and the count since the last revision come back from the saved
+    # history. The earlier observation is sent between the question and the answer it led to.
     assert endpoint.requests[0]["tools"] == [REVISE_BELIEFS_TOOL]
-    assert sent(endpoint.requests[0]) == context(UserMessage("How many G films?"), {1: "The user likes films."}, ANSWER)
+    assert sent(endpoint.requests[0]) == context({}, *earlier, UserMessage("And PG films?"))
 
 
 def test_stopping_early_leaves_valid_history():
@@ -218,7 +224,7 @@ def test_respond_stops_after_max_steps():
     assert UserMessage(LAST_STEP_NOTE) not in session.history
     assert len(engine.queries) == 2  # the last step's call is skipped
     assert entries[-2].run.error == "Canceled."
-    assert entries[-1] == AssistantMessage("Stopped after 3 steps without an answer.")
+    assert entries[-1] == AssistantMessage("Stopped after 3 steps without an answer.", final=True)
 
 
 def test_interrupt_before_the_next_request():
@@ -227,7 +233,7 @@ def test_interrupt_before_the_next_request():
     turn = session.respond("How many G films?")
     next(turn)
     session.interrupt()
-    assert list(turn) == [AssistantMessage("Interrupted.")]
+    assert list(turn) == [AssistantMessage("Interrupted.", final=True)]
     assert endpoint.requests == []
 
 
@@ -249,7 +255,7 @@ def test_interrupt_cancels_the_remaining_tool_calls():
     assert len(endpoint.requests) == 1
     assert [type(e) for e in entries] == [UserMessage, AssistantMessage, QueryResult, QueryResult, AssistantMessage]
     assert entries[3].run.error == "Canceled."
-    assert entries[4] == AssistantMessage("Interrupted.")
+    assert entries[4] == AssistantMessage("Interrupted.", final=True)
 
 
 def test_interrupt_between_turns_is_ignored():
