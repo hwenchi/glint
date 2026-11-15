@@ -80,6 +80,8 @@ class BeliefRevision:
     add: dict[int, str]  # new beliefs, by the numbers Glint gave them
     usage: Usage | None = None  # of the request that revised them, if the server reported it
     model: str | None = None  # as Glint asked for it
+    # The model's thinking before the revision, for the page. It isn't sent back to the model.
+    reasoning: str | None = None
     kind: Literal["belief_revision"] = "belief_revision"
 
 

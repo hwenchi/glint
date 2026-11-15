@@ -28,6 +28,9 @@ class FakeEndpoint:
     def _handle(self, request):
         self.requests.append(json.loads(request.content))
         reply = self.replies.pop(0) if len(self.replies) > 1 else self.replies[0]
+        message = to_api(reply)
+        if reply.reasoning:
+            message["reasoning_content"] = reply.reasoning  # as servers send it, beside the message
         response = {
             "id": "fake",
             "object": "chat.completion",
@@ -36,7 +39,7 @@ class FakeEndpoint:
             "choices": [{
                 "index": 0,
                 "finish_reason": "tool_calls" if reply.tool_calls else "stop",
-                "message": to_api(reply),
+                "message": message,
             }],
         }
         if reply.usage:

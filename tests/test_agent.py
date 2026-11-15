@@ -4,7 +4,7 @@ import pytest
 
 from fakes import RAW_RESULT, FakeEndpoint, FakeEngine
 from glint.agent import Session, beliefs_message, run_tool_call, skip_tool_call
-from glint.prompt import LAST_STEP_NOTE, system_prompt
+from glint.prompt import LAST_STEP_NOTE, REVISE_NOTE, system_prompt
 from glint.history import (
     AssistantMessage,
     BeliefRevision,
@@ -42,6 +42,11 @@ def sent(request) -> list:
 def context(beliefs, *entries) -> list:
     """The beliefs, then the conversation and the recent observations as they happened."""
     return [{"role": "user", "content": beliefs_message(beliefs)}, *map(to_api, entries)]
+
+
+def revising_context(beliefs, *entries) -> list:
+    """The context, then Glint's note asking for a revision."""
+    return [*context(beliefs, *entries), {"role": "user", "content": REVISE_NOTE}]
 
 
 def test_respond_without_tool_calls():
@@ -103,9 +108,19 @@ def test_respond_revises_every_max_observations():
     # After one observation, the model must revise, seeing it.
     assert revising["tools"] == [REVISE_BELIEFS_TOOL]
     assert revising["tool_choice"] == "required"
-    assert sent(revising) == context({}, *entries[0:3])
+    assert sent(revising) == revising_context({}, *entries[0:3])
     # Revising doesn't clear what the model sees.
     assert sent(answer) == context(belief, *entries[0:3])
+
+
+def test_respond_records_the_revision_reasoning():
+    reply = AssistantMessage(
+        None, NOTED.tool_calls, model="fake-model", reasoning="The result changes nothing I believe."
+    )
+    endpoint = FakeEndpoint(CALL_REPLY, reply, ANSWER)
+    session = Session(endpoint.client(), "fake-model", FakeEngine(), History(), max_observations=1)
+    entries = list(session.respond("How many G films?"))
+    assert entries[3] == BeliefRevision({}, {}, None, "fake-model", "The result changes nothing I believe.")
 
 
 def test_respond_forgets_the_oldest_observation():
@@ -147,7 +162,7 @@ def test_respond_retries_an_invalid_revision(arguments):
     assert revision == BeliefRevision({}, {}, Usage(50, 5), "fake-model")
     # The retry sees the failed call and its error, and must revise again.
     retry = endpoint.requests[2]
-    assert sent(retry) == context({}, user, call_reply, result, reply, error)
+    assert sent(retry) == revising_context({}, user, call_reply, result, reply, error)
     assert retry["tools"] == [REVISE_BELIEFS_TOOL]
 
 
@@ -175,7 +190,7 @@ def test_respond_continues_saved_history(tmp_path):
     # The conversation, the recent observations and the count since the last revision come back from the saved
     # history. The earlier observation is sent between the question and the answer it led to.
     assert endpoint.requests[0]["tools"] == [REVISE_BELIEFS_TOOL]
-    assert sent(endpoint.requests[0]) == context({}, *earlier, UserMessage("And PG films?"))
+    assert sent(endpoint.requests[0]) == revising_context({}, *earlier, UserMessage("And PG films?"))
 
 
 def test_stopping_early_leaves_valid_history():

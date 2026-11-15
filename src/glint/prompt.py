@@ -1,6 +1,7 @@
 """The system prompt: Glint's instructions to the model."""
 
 LAST_STEP_NOTE = "Glint: This is your last reply. Answer now, without querying."
+REVISE_NOTE = "Glint: Revise your beliefs now with revise_beliefs."
 
 
 def system_prompt(max_steps: int, max_beliefs: int, max_observations: int) -> str:

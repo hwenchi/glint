@@ -131,33 +131,33 @@ main {
   stroke-linejoin: round;
 }
 
-/* The model's thinking before the reply: a step, quieter than the reply */
-.assistant .reasoning {
+/* The model's thinking before a reply or revision: a step, quieter than what follows */
+.reasoning {
   margin: 0.25rem 0 0;
 }
 
 /* The reply follows its reasoning closely. */
-.assistant .reasoning + * {
+.reasoning + * {
   margin-top: 0.35rem;
 }
 
 /* Its label matches the steps': the reply's serif would set it apart. */
-.assistant .reasoning > summary {
+.reasoning > summary {
   font-family: var(--sans);
 }
 
-.assistant .reasoning > div {
+.reasoning > div {
   margin: 0.25rem 0;
   font-size: 0.9rem;
   color: var(--muted);
 }
 
 /* No gap above the first line or below the last: the rule spans the text alone. */
-.assistant .reasoning > div > :first-child {
+.reasoning > div > :first-child {
   margin-top: 0;
 }
 
-.assistant .reasoning > div > :last-child {
+.reasoning > div > :last-child {
   margin-bottom: 0;
 }
 
@@ -622,7 +622,7 @@ dialog.beliefs li del {
   }
 
   /* Browsers darken light text when printing without backgrounds; the reasoning stays grey. */
-  .assistant .reasoning > div {
+  .reasoning > div {
     print-color-adjust: exact;
   }
 

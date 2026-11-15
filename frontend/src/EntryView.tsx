@@ -31,16 +31,7 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
       return hasText || entry.model ? (
         <div className="assistant">
           {entry.model && <Byline model={entry.model} usage={entry.usage} />}
-          {entry.reasoning?.trim() && (
-            <details className="step reasoning">
-              <summary>
-                <span>Reasoning</span>
-              </summary>
-              <div>
-                <Markdown text={entry.reasoning} />
-              </div>
-            </details>
-          )}
+          {entry.reasoning?.trim() && <Reasoning text={entry.reasoning} />}
           {hasText && <Markdown text={entry.text!} />}
         </div>
       ) : null;
@@ -68,6 +59,7 @@ function RevisionView({ revision }: { revision: BeliefRevision }) {
   return (
     <div className="revision-entry">
       {revision.model && <Byline model={revision.model} usage={revision.usage} />}
+      {revision.reasoning?.trim() && <Reasoning text={revision.reasoning} />}
       <details className="step revision" open>
         <summary>
           <span>Revised beliefs</span>
@@ -107,6 +99,20 @@ function Markdown({ text }: { text: string }) {
     >
       {text}
     </ReactMarkdown>
+  );
+}
+
+// The model's thinking before a reply or revision, closed by default.
+function Reasoning({ text }: { text: string }) {
+  return (
+    <details className="step reasoning">
+      <summary>
+        <span>Reasoning</span>
+      </summary>
+      <div>
+        <Markdown text={text} />
+      </div>
+    </details>
   );
 }
 

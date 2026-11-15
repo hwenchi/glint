@@ -24,7 +24,7 @@ from glint.history import (
     in_conversation,
     to_api,
 )
-from glint.prompt import LAST_STEP_NOTE, system_prompt
+from glint.prompt import LAST_STEP_NOTE, REVISE_NOTE, system_prompt
 from glint.tool import (
     QUERY_TOOL,
     REVISE_BELIEFS_TOOL,
@@ -144,7 +144,7 @@ class Session:
             for statement in args.add:
                 add[number] = statement
                 number += 1
-        revision = BeliefRevision(drop, add, reply.usage, reply.model)
+        revision = BeliefRevision(drop, add, reply.usage, reply.model, reply.reasoning)
         self.beliefs.apply(revision)
         return revision
 
@@ -179,6 +179,8 @@ class Session:
                     messages.append({"role": "user", "content": LAST_STEP_NOTE})
                     tools, tool_choice = NOT_GIVEN, NOT_GIVEN
                 elif revising:
+                    # Also said in words: some servers don't enforce tool_choice.
+                    messages.append({"role": "user", "content": REVISE_NOTE})
                     tools, tool_choice = [REVISE_BELIEFS_TOOL], "required"
                 else:
                     tools, tool_choice = [QUERY_TOOL], NOT_GIVEN

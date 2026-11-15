@@ -211,6 +211,17 @@
             ],
             "title": "Model"
           },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
           "kind": {
             "type": "string",
             "const": "belief_revision",
