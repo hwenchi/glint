@@ -4,51 +4,69 @@
 
 ## What is Glint?
 
-Glint lets you explore PostgreSQL databases using natural language. A language model investigates your data through SQL and presents its findings as tables and charts. Each step shows the SQL it ran and the results it received.
+Glint lets you explore PostgreSQL databases using natural language. An AI agent investigates your data by writing and executing SQL, then presents its findings as tables and charts.
 
-Glint is built around a simple principle: an agent should have access only to what it needs, and retain only what matters. This principle shapes two aspects of its design: what the agent can access and what it remembers.
+Every step is visible: the SQL it ran and the results it received.
 
-First, Glint takes a deliberately minimal approach to access. Rather than giving the agent a broad set of tools, resources, and context by default, we start with nothing and introduce only what the task requires. In Glint, the database is the agent's only external resource. It has no other tools, no files, and no access to its full conversation history.
+Glint is built around two principles: **minimal access and selective memory.**
 
-Second, Glint takes a selective approach to memory. Human memory offers a useful analogy: unless we're deliberately trying to memorize something, we rarely remember the exact words spoken in a conversation. Instead, we retain what we understood from it. We build an understanding through experience, preserving what matters and revising it as we learn more. Glint follows a similar approach. Rather than retaining every detail of its interactions, it maintains an evolving understanding of the data—a set of beliefs that it updates as it investigates.
+### Minimal access
 
-The agent's working context is intentionally limited, too: it can see only a small window of recent steps alongside these accumulated beliefs. This keeps its immediate context focused on the current task while allowing its understanding to develop over time.
+The database is the agent's only external resource. Glint deliberately gives the agent no other tools, file access, or external resources.
+
+Its working context is also deliberately limited: it sees the conversation and a small rolling window of recent tool calls, including SQL queries and their results. Older tool calls are not passed to the model.
+
+### Selective memory
+
+Rather than retaining every query and result in its working context, Glint maintains an evolving set of beliefs about the data.
+
+These beliefs capture useful facts, relationships, and patterns discovered during an investigation. As new evidence comes in, the agent can add to them, revise them, or discard them.
+
+Every few steps, before older tool calls leave the working window, the model reviews and updates its beliefs. These updates are visible in the conversation.
+
+The result is an agent that can build an understanding of your data without carrying the entire history of its investigation.
 
 ## Safety
 
-The agent can query the database but cannot modify it.
+Glint is read-only. The agent can query the database but cannot modify it.
 
-Before execution, each query is checked to reject operations other than reads. Queries run in a read-only transaction that is rolled back afterward. Execution timeouts and row limits bound individual queries, while a step limit bounds each investigation.
+Every query passes through a read-only check before execution. Queries run inside a read-only transaction that is rolled back afterward.
+
+Execution timeouts and row limits constrain individual queries. A step limit constrains each investigation.
 
 ## Memory
 
-The model receives two forms of memory:
+The model receives two forms of context:
 
-- **Recent steps:** A deliberately small rolling window of recent messages, queries, and results.
-- **Beliefs:** A concise summary of facts, relationships, and patterns learned during the investigation.
+- **Recent tool calls:** A small rolling window of recent SQL queries and their results.
+- **Beliefs:** An evolving summary of facts, relationships, and patterns learned from the data.
 
-Every few steps, before older entries leave the window, the model reviews its beliefs, adding new findings, revising existing ones, and removing those it no longer considers valid. Each revision appears in the conversation.
-
-The full transcript is retained for auditing, but is never passed to the model in full. The model sees only its beliefs, recent steps, and the request it is answering.
+The full transcript, including conversation messages and tool calls, is retained for auditing. However, the model receives the conversation and accumulated beliefs alongside only a small window of recent tool calls—not the full history of tool calls.
 
 ## Running Glint
 
-Copy `glint.example.toml` to `glint.toml` and configure your PostgreSQL connection and an OpenAI-compatible model API that supports tool calling.
+Copy the example configuration:
+
+```sh
+cp glint.example.toml glint.toml
+```
+
+Configure your PostgreSQL connection and an OpenAI-compatible model API that supports tool calling.
 
 Run Glint:
 
-```bash
+```sh
 make
 ```
 
 Start the development setup:
 
-```bash
+```sh
 make dev
 ```
 
 Run the tests:
 
-```bash
+```sh
 make test
 ```
