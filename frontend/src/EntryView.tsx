@@ -32,8 +32,10 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
         <div className="assistant">
           {entry.model && <Byline model={entry.model} usage={entry.usage} />}
           {entry.reasoning?.trim() && (
-            <details className="reasoning">
-              <summary>Reasoning</summary>
+            <details className="step reasoning">
+              <summary>
+                <span>Reasoning</span>
+              </summary>
               <div>
                 <Markdown text={entry.reasoning} />
               </div>
@@ -47,9 +49,11 @@ export const EntryView = memo(function EntryView({ entry }: { entry: Entry }) {
       return <QueryRunView run={entry.run} />;
     case "invalid_call":
       return (
-        <details className="invalid-call">
-          <summary>Invalid call</summary>
-          <p>{entry.error}</p>
+        <details className="step failed">
+          <summary>
+            <span>Invalid call</span>
+          </summary>
+          <pre className="error">{entry.error}</pre>
         </details>
       );
     case "belief_revision":
@@ -64,7 +68,7 @@ function RevisionView({ revision }: { revision: BeliefRevision }) {
   return (
     <div className="revision-entry">
       {revision.model && <Byline model={revision.model} usage={revision.usage} />}
-      <details className="step revision">
+      <details className="step revision" open>
         <summary>
           <span>Revised beliefs</span>
           <small>

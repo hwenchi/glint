@@ -18,7 +18,7 @@ export function BeliefsPopup({ entries }: { entries: Entry[] }) {
       <dialog ref={dialog} className="beliefs" onClick={(event) => event.target === event.currentTarget && dialog.current!.close()}>
         <div>
           <header>
-            <h2>What the model believes now</h2>
+            <h2>Belief state</h2>
             <label>
               <input type="checkbox" checked={showDeleted} onChange={(event) => setShowDeleted(event.target.checked)} />
               Show deleted
