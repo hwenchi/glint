@@ -18,7 +18,7 @@ Before execution, each query is checked to reject operations other than reads. Q
 
 The model receives two forms of memory:
 
-- **Recent steps:** A rolling window of recent messages, queries, and results.
+- **Recent steps:** A deliberately small rolling window of recent messages, queries, and results.
 - **Beliefs:** A concise summary of facts, relationships, and patterns learned during the investigation.
 
 Every few steps, before older entries leave the window, the model reviews its beliefs, adding new findings, revising existing ones, and removing those it no longer considers valid. Each revision appears in the conversation.
